@@ -1,4 +1,9 @@
 [packages]
-
+torch = "1.7"
+torchvision = "1.7"
+tqdm = "*"
+Pillow = "*"
+pytorch_ssim = "*"
+pandas = "1.2"
 
 [dev-packages]
