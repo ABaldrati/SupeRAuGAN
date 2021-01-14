@@ -3,7 +3,7 @@ from os.path import join
 
 from PIL import Image
 from torch.utils.data.dataset import Dataset
-from torchvision.transforms import Compose, RandomCrop, ToTensor, ToPILImage, CenterCrop, Resize
+from torchvision.transforms import Compose, RandomCrop, ToTensor, ToPILImage, CenterCrop, Resize, Normalize
 
 
 def is_image_file(filename):
@@ -18,6 +18,7 @@ def train_hr_transform(crop_size):
     return Compose([
         RandomCrop(crop_size),
         ToTensor(),
+        Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
 
 
@@ -25,7 +26,8 @@ def train_lr_transform(crop_size, upscale_factor):
     return Compose([
         ToPILImage(),
         Resize(crop_size // upscale_factor, interpolation=Image.BICUBIC),
-        ToTensor()
+        ToTensor(),
+        Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
 
 
