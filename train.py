@@ -59,7 +59,7 @@ if __name__ == '__main__':
         mse_loss.cuda()
         feature_extractor.cuda()
 
-    results = {'d_total_loss': [], 'g_total_loss': [], 'd_real_mean': [], 'g_fake_mean': [], 'psnr': [], 'ssim': []}
+    results = {'d_total_loss': [], 'g_total_loss': [], 'd_real_mean': [], 'd_fake_mean': [], 'psnr': [], 'ssim': []}
 
     for epoch in range(1, NUM_EPOCHS + 1):
         train_bar = tqdm(train_loader, ncols=160)
@@ -71,24 +71,29 @@ if __name__ == '__main__':
 
         for data, target in train_bar:
             batch_size = data.size(0)
+            real_labels = torch.ones(batch_size)
+            fake_labels = torch.zeros(batch_size)
             running_results["batch_sizes"] += batch_size
 
             if torch.cuda.is_available():
                 target = target.cuda()
                 data = data.cuda()
+                real_labels = real_labels.cuda()
+                fake_labels = fake_labels.cuda()
 
             # Discriminator training
             d_optimizer.zero_grad()
 
             d_real_output = d_net(target)
-            d_real_output_loss = bce_loss(d_real_output, 1)
+            d_real_output_loss = bce_loss(d_real_output, real_labels)
 
             fake_img = g_net(data)
             d_fake_output = d_net(fake_img)
-            d_fake_output_loss = bce_loss(d_fake_output, 0)
+            d_fake_output_loss = bce_loss(d_fake_output, fake_labels)
 
             d_total_loss = d_real_output_loss + d_fake_output_loss
             d_total_loss.backward()
+            d_optimizer.step()
             d_scheduler.step()
 
             d_real_mean = d_real_output.mean()
@@ -98,11 +103,12 @@ if __name__ == '__main__':
             g_optimizer.zero_grad()
 
             fake_img = g_net(data)
-            adversarial_loss = bce_loss(d_net(fake_img), 1)
+            adversarial_loss = bce_loss(d_net(fake_img), real_labels)
             content_loss = mse_loss(feature_extractor(target), feature_extractor(fake_img))
 
             g_total_loss = content_loss + 1e-3 * adversarial_loss
             g_total_loss.backward()
+            g_optimizer.step()
             g_scheduler.step()
 
             running_results['g_epoch_total_loss'] += g_total_loss.item() * batch_size
