@@ -3,7 +3,7 @@ torch = "1.7"
 torchvision = "1.7"
 tqdm = "*"
 Pillow = "*"
-pytorch_ssim = "*"
+pytorch_ssim = { git = "http://github.com/Po-Hsun-Su/pytorch-ssim.git" }
 pandas = "1.2"
 tensorboard = "2.4"
 
