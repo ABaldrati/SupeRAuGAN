@@ -11,6 +11,7 @@ from torchvision.models import vgg16
 from tqdm import tqdm
 from math import log10
 import torchvision.utils as utils
+from torch.utils.tensorboard import SummaryWriter
 import datetime
 import pandas as pd
 
@@ -27,6 +28,11 @@ if __name__ == '__main__':
     val_set = ValDatasetFromFolder('data/DIV2K_valid_HR', upscale_factor=UPSCALE_FACTOR)
     train_loader = DataLoader(dataset=train_set, num_workers=4, batch_size=64, shuffle=True)
     val_loader = DataLoader(dataset=val_set, num_workers=4, batch_size=1, shuffle=False)
+
+    results_folder = Path(f"results_{training_start}_CS:{CROP_SIZE}_US:{UPSCALE_FACTOR}x")
+    results_folder.mkdir(exist_ok=True)
+
+    writer = SummaryWriter(str(results_folder / "tensorboard_log"))
 
     g_net = Generator(n_residual_blocks=16, upsample_factor=UPSCALE_FACTOR)
     d_net = Discriminator()
@@ -114,8 +120,8 @@ if __name__ == '__main__':
 
         g_net.eval()
         # ...
-        out_path = Path(f'training_results/SRF_{UPSCALE_FACTOR}')
-        out_path.mkdir(exist_ok=True)
+        images_path = results_folder / Path(f'training_images_results')
+        images_path.mkdir(exist_ok=True)
 
         with torch.no_grad():
             val_bar = tqdm(val_loader)
@@ -151,28 +157,30 @@ if __name__ == '__main__':
             val_images = torch.chunk(val_images, val_images.size(0) // 15)
             val_save_bar = tqdm(val_images, desc='[saving training results]')
 
-            for index, image in enumerate(val_save_bar, start=1):
-                image = utils.make_grid(image, nrow=3, padding=5)
-                utils.save_image(image, str(out_path / f'epoch_{epoch}_index_{index}.png'), padding=5)
+            for index, image_batch in enumerate(val_save_bar, start=1):
+                image_grid = utils.make_grid(image_batch, nrow=3, padding=5)
+                utils.save_image(image_grid, str(images_path / f'epoch_{epoch}_index_{index}.png'), padding=5)
+                writer.add_image(str(images_path / f'epoch_{epoch}_index_{index}.png'), image_grid)
 
         # save model parameters
-        torch.save(g_net.state_dict(), f'epochs/g_net_epoch_{UPSCALE_FACTOR}_{epoch}_{training_start}.pth')
-        torch.save(d_net.state_dict(), f'epochs/d_net_epoch_{UPSCALE_FACTOR}_{epoch}_{training_start}.pth')
+        torch.save(g_net.state_dict(), str(results_folder / f'saved_models/g_net_epoch_{epoch}.pth'))
+        torch.save(d_net.state_dict(), str(results_folder / f'saved_models/d_net_epoch_{epoch}.pth'))
 
         # save loss\scores\psnr\ssim
-        results['d_total_loss'].append(running_results['d_total_loss'] / running_results['batch_sizes'])
-        results['g_total_loss'].append(running_results['g_total_loss'] / running_results['batch_sizes'])
-        results['d_real_mean'].append(running_results['d_real_mean'] / running_results['batch_sizes'])
-        results['d_fake_mean'].append(running_results['d_fake_mean'] / running_results['batch_sizes'])
-        results['psnr'].append(val_results['psnr'])
-        results['ssim'].append(val_results['ssim'])
+        results['d_total_loss'].append(running_results['d_epoch_total_loss'] / running_results['batch_sizes'])
+        results['g_total_loss'].append(running_results['g_epoch_total_loss'] / running_results['batch_sizes'])
+        results['d_real_mean'].append(running_results['d_epoch_real_mean'] / running_results['batch_sizes'])
+        results['d_fake_mean'].append(running_results['d_epoch_fake_mean'] / running_results['batch_sizes'])
+        results['psnr'].append(val_results['epoch_avg_psnr'])
+        results['ssim'].append(val_results['epoch_avg_ssim'])
+
+        for metric, metric_values in results.items():
+            writer.add_scalar(metric, metric_values[-1], epoch)
 
         if epoch % 10 == 0 and epoch != 0:
-            out_path = Path('statistics')
-            out_path.mkdir(exist_ok=True)
             data_frame = pd.DataFrame(
                 data={'d_total_loss': results['d_total_loss'], 'g_total_loss': results['g_total_loss'],
                       'd_real_mean': results['d_real_mean'],
                       'd_fake_mean': results['d_fake_mean'], 'PSNR': results['psnr'], 'SSIM': results['ssim']},
                 index=range(1, epoch + 1))
-            data_frame.to_csv(str(out_path / f"srf_{UPSCALE_FACTOR}_train_results.csv"), index_label='Epoch')
+            data_frame.to_csv(str(results_folder / f"train_results.csv"), index_label='Epoch')
