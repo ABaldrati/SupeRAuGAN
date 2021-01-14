@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import pytorch_ssim
@@ -19,17 +18,17 @@ from data_utils import TrainDatasetFromFolder, ValDatasetFromFolder, display_tra
 from model import Generator, Discriminator
 
 NUM_EPOCHS = int(2e5)
-CROP_SIZE = 96
+PATCH_SIZE = 96
 UPSCALE_FACTOR = 4
 
 if __name__ == '__main__':
     training_start = datetime.datetime.now().isoformat()
-    train_set = TrainDatasetFromFolder('data/DIV2K_train_HR', crop_size=CROP_SIZE, upscale_factor=UPSCALE_FACTOR)
+    train_set = TrainDatasetFromFolder('data/DIV2K_train_HR', patch_size=PATCH_SIZE, upscale_factor=UPSCALE_FACTOR)
     val_set = ValDatasetFromFolder('data/DIV2K_valid_HR', upscale_factor=UPSCALE_FACTOR)
     train_loader = DataLoader(dataset=train_set, num_workers=4, batch_size=64, shuffle=True)
     val_loader = DataLoader(dataset=val_set, num_workers=4, batch_size=1, shuffle=False)
 
-    results_folder = Path(f"results_{training_start}_CS:{CROP_SIZE}_US:{UPSCALE_FACTOR}x")
+    results_folder = Path(f"results_{training_start}_CS:{PATCH_SIZE}_US:{UPSCALE_FACTOR}x")
     results_folder.mkdir(exist_ok=True)
 
     writer = SummaryWriter(str(results_folder / "tensorboard_log"))
@@ -44,8 +43,8 @@ if __name__ == '__main__':
     g_optimizer = optim.Adam(g_net.parameters(), lr=1e-4)
     d_optimizer = optim.Adam(d_net.parameters(), lr=1e-4)
 
-    g_scheduler = StepLR(g_optimizer, step_size=int(1e5), gamma=0.1)
-    d_scheduler = StepLR(g_optimizer, step_size=int(1e5), gamma=0.1)
+    g_scheduler = StepLR(g_optimizer, step_size=NUM_EPOCHS // 2, gamma=0.1)
+    d_scheduler = StepLR(d_optimizer, step_size=NUM_EPOCHS // 2, gamma=0.1)
 
     bce_loss = BCELoss()
     mse_loss = MSELoss()
@@ -63,7 +62,7 @@ if __name__ == '__main__':
     results = {'d_total_loss': [], 'g_total_loss': [], 'd_real_mean': [], 'g_fake_mean': [], 'psnr': [], 'ssim': []}
 
     for epoch in range(1, NUM_EPOCHS + 1):
-        train_bar = tqdm(train_loader)
+        train_bar = tqdm(train_loader, ncols=160)
         running_results = {'batch_sizes': 0, 'd_epoch_total_loss': 0, 'g_epoch_total_loss': 0, 'd_epoch_real_mean': 0,
                            'd_epoch_fake_mean': 0}
 
@@ -166,7 +165,7 @@ if __name__ == '__main__':
         torch.save(g_net.state_dict(), str(results_folder / f'saved_models/g_net_epoch_{epoch}.pth'))
         torch.save(d_net.state_dict(), str(results_folder / f'saved_models/d_net_epoch_{epoch}.pth'))
 
-        # save loss\scores\psnr\ssim
+        # save loss / scores / psnr /ssim
         results['d_total_loss'].append(running_results['d_epoch_total_loss'] / running_results['batch_sizes'])
         results['g_total_loss'].append(running_results['g_epoch_total_loss'] / running_results['batch_sizes'])
         results['d_real_mean'].append(running_results['d_epoch_real_mean'] / running_results['batch_sizes'])
