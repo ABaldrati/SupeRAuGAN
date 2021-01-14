@@ -98,7 +98,7 @@ class Discriminator(nn.Module):
         self.bn6 = nn.BatchNorm2d(base_filters * 4)
 
         self.conv7 = nn.Conv2d(base_filters * 4, base_filters * 8, kernel_size=3, stride=1, padding=1)
-        self.bn7 = nn.BatchNorm2d(base_filters * 4)
+        self.bn7 = nn.BatchNorm2d(base_filters * 8)
 
         self.conv8 = nn.Conv2d(base_filters * 8, base_filters * 8, kernel_size=3, stride=2, padding=1)
         self.bn8 = nn.BatchNorm2d(base_filters * 8)
