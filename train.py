@@ -123,53 +123,58 @@ if __name__ == '__main__':
                      f'D(x): {running_results["d_epoch_real_mean"] / running_results["batch_sizes"]:.4f} '
                      f'D(G(z)): {running_results["d_epoch_fake_mean"] / running_results["batch_sizes"]:.4f}')
 
-        g_net.eval()
-        # ...
-        images_path = results_folder / Path(f'training_images_results')
-        images_path.mkdir(exist_ok=True)
+        if epoch % 50 == 1:
+            g_net.eval()
+            # ...
+            images_path = results_folder / Path(f'training_images_results')
+            images_path.mkdir(exist_ok=True)
 
-        with torch.no_grad():
-            val_bar = tqdm(val_loader)
-            val_results = {'epoch_mse': 0, 'epoch_ssim': 0, 'epoch_psnr': 0, 'epoch_avg_psnr': 0, 'epoch_avg_ssim': 0,
-                           'batch_sizes': 0, }
-            val_images = []
-            for lr, val_hr_restore, hr in val_bar:
-                batch_size = lr.size(0)
-                val_results['batch_sizes'] += batch_size
-                if torch.cuda.is_available():
-                    hr = hr.cuda()
-                    lr = lr.cuda()
+            with torch.no_grad():
+                val_bar = tqdm(val_loader, ncols=160)
+                val_results = {'epoch_mse': 0, 'epoch_ssim': 0, 'epoch_psnr': 0, 'epoch_avg_psnr': 0,
+                               'epoch_avg_ssim': 0,
+                               'batch_sizes': 0, }
+                val_images = []
+                for lr, val_hr_restore, hr in val_bar:
+                    batch_size = lr.size(0)
+                    val_results['batch_sizes'] += batch_size
+                    if torch.cuda.is_available():
+                        hr = hr.cuda()
+                        lr = lr.cuda()
 
-                sr = g_net(lr)
+                    sr = g_net(lr)
+                    sr = ((sr + 1) / 2)  # rescale values from [-1,1] to [0,1]
 
-                batch_mse = ((sr - hr) ** 2).data.mean()  # Pixel-wise MSE
-                val_results['epoch_mse'] += batch_mse * batch_size
-                batch_ssim = pytorch_ssim.ssim(sr, hr).item()
-                val_results['epoch_ssim'] += batch_ssim * batch_size
-                val_results['epoch_avg_ssim'] = val_results['epoch_ssim'] / val_results['batch_sizes']
-                val_results['epoch_psnr'] += 20 * log10(hr.max() / (batch_mse / batch_size)) * batch_size
-                val_results['epoch_avg_psnr'] += val_results['epoch_psnr'] / val_results['batch_sizes']
+                    batch_mse = ((sr - hr) ** 2).data.mean()  # Pixel-wise MSE
+                    val_results['epoch_mse'] += batch_mse * batch_size
+                    batch_ssim = pytorch_ssim.ssim(sr, hr).item()
+                    val_results['epoch_ssim'] += batch_ssim * batch_size
+                    val_results['epoch_avg_ssim'] = val_results['epoch_ssim'] / val_results['batch_sizes']
+                    val_results['epoch_psnr'] += 20 * log10(hr.max() / (batch_mse / batch_size)) * batch_size
+                    val_results['epoch_avg_psnr'] = val_results['epoch_psnr'] / val_results['batch_sizes']
 
-                val_bar.set_description(
-                    desc=f"[converting LR images to SR images] PSNR: {val_results['epoch_avg_psnr']:4f} dB SSIM: {val_results['epoch_avg_ssim']:4f}")
+                    val_bar.set_description(
+                        desc=f"[converting LR images to SR images] PSNR: {val_results['epoch_avg_psnr']:4f} dB SSIM: {val_results['epoch_avg_ssim']:4f}")
 
-                # This requires validation batch size = 1
-                val_images.extend(
-                    [display_transform()(val_hr_restore.squeeze(0)), display_transform()(hr.data.cpu().squeeze(0)),
-                     display_transform()(sr.data.cpu().squeeze(0))])
+                    # This requires validation batch size = 1
+                    val_images.extend(
+                        [display_transform()(val_hr_restore.squeeze(0)), display_transform()(hr.data.cpu().squeeze(0)),
+                         display_transform()(sr.data.cpu().squeeze(0))])
 
-            val_images = torch.stack(val_images)
-            val_images = torch.chunk(val_images, val_images.size(0) // 15)
-            val_save_bar = tqdm(val_images, desc='[saving training results]')
+                val_images = torch.stack(val_images)
+                val_images = torch.chunk(val_images, val_images.size(0) // 15)
+                val_save_bar = tqdm(val_images, desc='[saving training results]', ncols=160)
 
-            for index, image_batch in enumerate(val_save_bar, start=1):
-                image_grid = utils.make_grid(image_batch, nrow=3, padding=5)
-                utils.save_image(image_grid, str(images_path / f'epoch_{epoch}_index_{index}.png'), padding=5)
-                writer.add_image(str(images_path / f'epoch_{epoch}_index_{index}.png'), image_grid)
+                for index, image_batch in enumerate(val_save_bar, start=1):
+                    image_grid = utils.make_grid(image_batch, nrow=3, padding=5)
+                    utils.save_image(image_grid, str(images_path / f'epoch_{epoch}_index_{index}.png'), padding=5)
+                    writer.add_image(f'epoch_{epoch}_index_{index}.png', image_grid)
 
         # save model parameters
-        torch.save(g_net.state_dict(), str(results_folder / f'saved_models/g_net_epoch_{epoch}.pth'))
-        torch.save(d_net.state_dict(), str(results_folder / f'saved_models/d_net_epoch_{epoch}.pth'))
+        models_path = results_folder / "saved_models"
+        models_path.mkdir(exist_ok=True)
+        torch.save(g_net.state_dict(), str(models_path / f'epoch_{epoch}_g_net.pth'))
+        torch.save(d_net.state_dict(), str(models_path / f'epoch_{epoch}_d_net.pth'))
 
         # save loss / scores / psnr /ssim
         results['d_total_loss'].append(running_results['d_epoch_total_loss'] / running_results['batch_sizes'])
@@ -182,7 +187,7 @@ if __name__ == '__main__':
         for metric, metric_values in results.items():
             writer.add_scalar(metric, metric_values[-1], epoch)
 
-        if epoch % 10 == 0 and epoch != 0:
+        if epoch % 50 == 1:
             data_frame = pd.DataFrame(
                 data={'d_total_loss': results['d_total_loss'], 'g_total_loss': results['g_total_loss'],
                       'd_real_mean': results['d_real_mean'],
