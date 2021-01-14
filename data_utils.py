@@ -64,6 +64,13 @@ class ValDatasetFromFolder(Dataset):
         self.image_filenames = [join(dataset_dir, x) for x in listdir(dataset_dir) if is_image_file(x)]
 
     def __getitem__(self, index):
+        """
+        :return:
+            * lr_image: downsampled and center-cropped images
+            * hr_restore_image = upsampling of lr_image with bicubic interpolation
+            * hr_image = center-cropped original image
+
+        """
         hr_image = Image.open(self.image_filenames[index])
         w, h = hr_image.size
         crop_size = calculate_valid_crop_size(min(w, h), self.upscale_factor)
