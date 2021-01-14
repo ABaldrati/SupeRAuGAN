@@ -74,7 +74,7 @@ class Generator(nn.Module):
         for module in self.upsample_blocks:
             output = module(output)
 
-        return F.tanh(self.last_conv(output))
+        return torch.tanh(self.last_conv(output))
 
 class Discriminator(nn.Module):
     def __init__(self, base_filters=64):
@@ -120,4 +120,4 @@ class Discriminator(nn.Module):
 
         output = self.global_pooling(output)
         output = F.leaky_relu(self.post_pooling_conv(output), 0.2)
-        return F.sigmoid(self.output_conv(output).view(batch_size))
+        return torch.sigmoid(self.output_conv(output).view(batch_size))
