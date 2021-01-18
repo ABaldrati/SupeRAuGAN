@@ -72,7 +72,7 @@ class Generator(nn.Module):
         output = self.post_residual_blocks(output)
         output = torch.add(output, first_output)
 
-        output = self.residual_blocks(output)
+        output = self.upsample_block(output)
 
         return torch.tanh(self.last_conv(output))
 
@@ -106,7 +106,7 @@ class Discriminator(nn.Module):
         self.bn8 = nn.BatchNorm2d(base_filters * 8)
 
         self.classifier = nn.Sequential(
-            nn.Linear(base_filters * 8 * ((self.patch_size // 8) ** 2), 1024),
+            nn.Linear(base_filters * 8 * ((self.patch_size // 16) ** 2), 1024),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Linear(1024, 1),
             nn.Sigmoid()
