@@ -1,32 +1,36 @@
+import datetime
+from math import log10
 from pathlib import Path
 
+import pandas as pd
 import pytorch_ssim
 import torch
+import torchvision.utils as utils
 from torch import optim, nn
 from torch.nn import BCELoss, MSELoss
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
-from torchvision.models import vgg16
-from tqdm import tqdm
-from math import log10
-import torchvision.utils as utils
 from torch.utils.tensorboard import SummaryWriter
-import datetime
-import pandas as pd
+from torchvision.models import vgg19
+from torchvision.transforms import transforms
+from tqdm import tqdm
 
 from data_utils import TrainDatasetFromFolder, ValDatasetFromFolder, display_transform
 from model import Generator, Discriminator
 
 NUM_EPOCHS = int(2e5)
+PRETRAIN_EPOCHS = 0
 PATCH_SIZE = 96
 UPSCALE_FACTOR = 4
+VALIDATION_FREQUENCY = 50
+NUM_LOGGED_VALIDATION_IMAGES = 30
 
 if __name__ == '__main__':
     training_start = datetime.datetime.now().isoformat()
     train_set = TrainDatasetFromFolder('data/DIV2K_train_HR', patch_size=PATCH_SIZE, upscale_factor=UPSCALE_FACTOR)
     val_set = ValDatasetFromFolder('data/DIV2K_valid_HR', upscale_factor=UPSCALE_FACTOR)
-    train_loader = DataLoader(dataset=train_set, num_workers=4, batch_size=64, shuffle=True)
-    val_loader = DataLoader(dataset=val_set, num_workers=4, batch_size=1, shuffle=False)
+    train_loader = DataLoader(dataset=train_set, num_workers=4, batch_size=64, shuffle=True, pin_memory=True)
+    val_loader = DataLoader(dataset=val_set, num_workers=4, batch_size=1, shuffle=False, pin_memory=True)
 
     results_folder = Path(f"results_{training_start}_CS:{PATCH_SIZE}_US:{UPSCALE_FACTOR}x")
     results_folder.mkdir(exist_ok=True)
