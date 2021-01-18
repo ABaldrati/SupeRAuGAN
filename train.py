@@ -141,7 +141,7 @@ if __name__ == '__main__':
                      f'D(x): {running_results["d_epoch_real_mean"] / running_results["batch_sizes"]:.4f} '
                      f'D(G(z)): {running_results["d_epoch_fake_mean"] / running_results["batch_sizes"]:.4f}')
 
-        if epoch % 50 == 1:
+        if epoch % VALIDATION_FREQUENCY == 1 or VALIDATION_FREQUENCY == 1:
             g_net.eval()
             # ...
             images_path = results_folder / Path(f'training_images_results')
@@ -168,24 +168,25 @@ if __name__ == '__main__':
                     batch_ssim = pytorch_ssim.ssim(sr, hr).item()
                     val_results['epoch_ssim'] += batch_ssim * batch_size
                     val_results['epoch_avg_ssim'] = val_results['epoch_ssim'] / val_results['batch_sizes']
-                    val_results['epoch_psnr'] += 20 * log10(hr.max() / (batch_mse / batch_size)) * batch_size
+                    val_results['epoch_psnr'] += 20 * log10(
+                        hr.max() / (batch_mse / batch_size)) * batch_size  # TODO: Is it hr.max() or sr.max()?
                     val_results['epoch_avg_psnr'] = val_results['epoch_psnr'] / val_results['batch_sizes']
 
                     val_bar.set_description(
                         desc=f"[converting LR images to SR images] PSNR: {val_results['epoch_avg_psnr']:4f} dB SSIM: {val_results['epoch_avg_ssim']:4f}")
-
-                    # This requires validation batch size = 1
-                    val_images.extend(
-                        [display_transform()(val_hr_restore.squeeze(0)), display_transform()(hr.data.cpu().squeeze(0)),
-                         display_transform()(sr.data.cpu().squeeze(0))])
+                    if len(val_images) < NUM_LOGGED_VALIDATION_IMAGES * 3:
+                        # This requires validation batch size = 1
+                        val_images.extend(
+                            [display_transform()(val_hr_restore.squeeze(0)),
+                             display_transform()(hr.data.cpu().squeeze(0)),
+                             display_transform()(sr.data.cpu().squeeze(0))])
 
                 val_images = torch.stack(val_images)
                 val_images = torch.chunk(val_images, val_images.size(0) // 15)
-                val_save_bar = tqdm(val_images, desc='[saving training results]', ncols=160)
+                val_save_bar = tqdm(val_images, desc='[saving validation results]', ncols=160)
 
                 for index, image_batch in enumerate(val_save_bar, start=1):
                     image_grid = utils.make_grid(image_batch, nrow=3, padding=5)
-                    utils.save_image(image_grid, str(images_path / f'epoch_{epoch}_index_{index}.png'), padding=5)
                     writer.add_image(f'epoch_{epoch}_index_{index}.png', image_grid)
 
         # save model parameters
@@ -205,7 +206,7 @@ if __name__ == '__main__':
         for metric, metric_values in results.items():
             writer.add_scalar(metric, metric_values[-1], epoch)
 
-        if epoch % 50 == 1:
+        if epoch % VALIDATION_FREQUENCY == 1 or VALIDATION_FREQUENCY == 1:
             data_frame = pd.DataFrame(
                 data={'d_total_loss': results['d_total_loss'], 'g_total_loss': results['g_total_loss'],
                       'd_real_mean': results['d_real_mean'],
