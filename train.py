@@ -213,3 +213,9 @@ if __name__ == '__main__':
                       'd_fake_mean': results['d_fake_mean'], 'PSNR': results['psnr'], 'SSIM': results['ssim']},
                 index=range(1, epoch + 1))
             data_frame.to_csv(str(results_folder / f"train_results.csv"), index_label='Epoch')
+
+            # save model parameters
+            models_path = results_folder / "saved_models"
+            models_path.mkdir(exist_ok=True)
+            torch.save(g_net.state_dict(), str(models_path / f'epoch_{epoch}_g_net.pth'))
+            torch.save(d_net.state_dict(), str(models_path / f'epoch_{epoch}_d_net.pth'))
