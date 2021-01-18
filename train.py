@@ -79,15 +79,16 @@ if __name__ == '__main__':
 
         for data, target in train_bar:
             batch_size = data.size(0)
-            real_labels = torch.ones(batch_size)
-            fake_labels = torch.zeros(batch_size)
             running_results["batch_sizes"] += batch_size
 
             if torch.cuda.is_available():
                 target = target.cuda()
                 data = data.cuda()
-                real_labels = real_labels.cuda()
-                fake_labels = fake_labels.cuda()
+                real_labels = torch.ones(batch_size, device=torch.device('cuda'))
+                fake_labels = torch.zeros(batch_size, device=torch.device('cuda'))
+            else:
+                real_labels = torch.ones(batch_size)
+                fake_labels = torch.zeros(batch_size)
 
             if epoch > PRETRAIN_EPOCHS:
                 # Discriminator training
