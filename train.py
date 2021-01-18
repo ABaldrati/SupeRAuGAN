@@ -57,8 +57,8 @@ if __name__ == '__main__':
     bce_loss = BCELoss()
     mse_loss = MSELoss()
 
-    vgg = vgg16(pretrained=True)
-    feature_extractor = nn.Sequential(*list(vgg.features)[:31]).eval()
+    vgg = vgg19(pretrained=True)
+    feature_extractor = nn.Sequential(*list(vgg.features)[:36]).eval()
     for param in feature_extractor.parameters():
         param.requires_grad = False
 
