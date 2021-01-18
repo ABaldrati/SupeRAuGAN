@@ -45,6 +45,9 @@ if __name__ == '__main__':
         g_net.cuda()
         d_net.cuda()
 
+    vgg_normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])  # vgg pretrained network use this normalization
+
     g_optimizer = optim.Adam(g_net.parameters(), lr=1e-4)
     d_optimizer = optim.Adam(d_net.parameters(), lr=1e-4)
 
@@ -109,7 +112,10 @@ if __name__ == '__main__':
 
             fake_img = g_net(data)
             adversarial_loss = bce_loss(d_net(fake_img), real_labels)
-            content_loss = mse_loss(feature_extractor(target), feature_extractor(fake_img))
+            target_unit_range = vgg_normalize((target + 1) / 2)  # rescale in [0,1] then to VGG training set range
+            fake_unit_range = vgg_normalize((fake_img + 1) / 2)  # rescale in [0,1] then to VGG training set range
+
+            content_loss = mse_loss(feature_extractor(target_unit_range), feature_extractor(fake_unit_range))
 
             g_total_loss = content_loss + 1e-3 * adversarial_loss
             g_total_loss.backward()
