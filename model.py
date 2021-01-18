@@ -78,9 +78,10 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, base_filters=64):
+    def __init__(self, base_filters=64, patch_size=96):
         super().__init__()
 
+        self.patch_size = patch_size
         self.conv1 = nn.Conv2d(3, base_filters, kernel_size=3, stride=1, padding=1)
 
         self.conv2 = nn.Conv2d(base_filters, base_filters, kernel_size=3, stride=2, padding=1)
@@ -104,9 +105,12 @@ class Discriminator(nn.Module):
         self.conv8 = nn.Conv2d(base_filters * 8, base_filters * 8, kernel_size=3, stride=2, padding=1)
         self.bn8 = nn.BatchNorm2d(base_filters * 8)
 
-        self.global_pooling = nn.AdaptiveAvgPool2d(1)
-        self.post_pooling_conv = nn.Conv2d(base_filters * 8, base_filters * 16, kernel_size=1)
-        self.output_conv = nn.Conv2d(base_filters * 16, 1, kernel_size=1)
+        self.classifier = nn.Sequential(
+            nn.Linear(base_filters * 8 * ((self.patch_size // 8) ** 2), 1024),
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Linear(1024, 1),
+            nn.Sigmoid()
+        )
 
     def forward(self, x):
         batch_size = x.size(0)
@@ -118,7 +122,6 @@ class Discriminator(nn.Module):
         output = F.leaky_relu(self.bn6(self.conv6(output)), 0.2)
         output = F.leaky_relu(self.bn7(self.conv7(output)), 0.2)
         output = F.leaky_relu(self.bn8(self.conv8(output)), 0.2)
+        output = torch.flatten(output, 1)
+        return self.classifier(output).view(batch_size)
 
-        output = self.global_pooling(output)
-        output = F.leaky_relu(self.post_pooling_conv(output), 0.2)
-        return torch.sigmoid(self.output_conv(output).view(batch_size))
