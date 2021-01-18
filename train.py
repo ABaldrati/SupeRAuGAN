@@ -41,6 +41,7 @@ if __name__ == '__main__':
     d_net = Discriminator()
 
     if torch.cuda.is_available():
+        torch.backends.cudnn.benchmark = True
         g_net.cuda()
         d_net.cuda()
 
