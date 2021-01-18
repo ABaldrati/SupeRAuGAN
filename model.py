@@ -51,30 +51,31 @@ class Generator(nn.Module):
             nn.PReLU()
         )
 
-        self.residual_blocks = nn.ModuleList([ResidualBlock(base_filters) for _ in range(n_residual_blocks)])
+        residual_blocks_list = [ResidualBlock(base_filters) for _ in range(n_residual_blocks)]
+        self.residual_blocks = nn.Sequential(*residual_blocks_list)
 
         self.post_residual_blocks = nn.Sequential(
             nn.Conv2d(base_filters, base_filters, kernel_size=3, padding=1),
             nn.BatchNorm2d(base_filters)
         )
 
-        self.upsample_blocks = nn.ModuleList([UpsampleBlock(base_filters, 2) for _ in range(self.upsample_block_num)])
+        upsample_blocks_list = [UpsampleBlock(base_filters, 2) for _ in range(self.upsample_block_num)]
+        self.upsample_block = nn.Sequential(*upsample_blocks_list)
 
         self.last_conv = nn.Conv2d(base_filters, 3, kernel_size=9, padding=4)
 
     def forward(self, x):
         first_output = self.first_block(x)
 
-        output = first_output.clone()
-        for module in self.residual_blocks:
-            output = module(output)
+        output = self.residual_blocks(first_output)
 
-        output = self.post_residual_blocks(output) + first_output
+        output = self.post_residual_blocks(output)
+        output = torch.add(output, first_output)
 
-        for module in self.upsample_blocks:
-            output = module(output)
+        output = self.residual_blocks(output)
 
         return torch.tanh(self.last_conv(output))
+
 
 class Discriminator(nn.Module):
     def __init__(self, base_filters=64):
