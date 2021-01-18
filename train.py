@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     results = {'d_total_loss': [], 'g_total_loss': [], 'd_real_mean': [], 'd_fake_mean': [], 'psnr': [], 'ssim': []}
 
-    for epoch in range(1, NUM_EPOCHS + 1):
+    for epoch in range(1, PRETRAIN_EPOCHS + NUM_EPOCHS + 1):
         train_bar = tqdm(train_loader, ncols=160)
         running_results = {'batch_sizes': 0, 'd_epoch_total_loss': 0, 'g_epoch_total_loss': 0, 'd_epoch_real_mean': 0,
                            'd_epoch_fake_mean': 0}
@@ -89,43 +89,49 @@ if __name__ == '__main__':
                 real_labels = real_labels.cuda()
                 fake_labels = fake_labels.cuda()
 
-            # Discriminator training
-            d_optimizer.zero_grad()
+            if epoch > PRETRAIN_EPOCHS:
+                # Discriminator training
+                d_optimizer.zero_grad(set_to_none=True)
 
-            d_real_output = d_net(target)
-            d_real_output_loss = bce_loss(d_real_output, real_labels)
+                d_real_output = d_net(target)
+                d_real_output_loss = bce_loss(d_real_output, real_labels)
 
-            fake_img = g_net(data)
-            d_fake_output = d_net(fake_img)
-            d_fake_output_loss = bce_loss(d_fake_output, fake_labels)
+                fake_img = g_net(data)
+                d_fake_output = d_net(fake_img)
+                d_fake_output_loss = bce_loss(d_fake_output, fake_labels)
 
-            d_total_loss = d_real_output_loss + d_fake_output_loss
-            d_total_loss.backward()
-            d_optimizer.step()
-            d_scheduler.step()
+                d_total_loss = d_real_output_loss + d_fake_output_loss
+                d_total_loss.backward()
+                d_optimizer.step()
+                d_scheduler.step()
 
-            d_real_mean = d_real_output.mean()
-            d_fake_mean = d_fake_output.mean()
+                d_real_mean = d_real_output.mean()
+                d_fake_mean = d_fake_output.mean()
 
             # Generator training
-            g_optimizer.zero_grad()
+            g_optimizer.zero_grad(set_to_none=True)
 
             fake_img = g_net(data)
-            adversarial_loss = bce_loss(d_net(fake_img), real_labels)
-            target_unit_range = vgg_normalize((target + 1) / 2)  # rescale in [0,1] then to VGG training set range
-            fake_unit_range = vgg_normalize((fake_img + 1) / 2)  # rescale in [0,1] then to VGG training set range
+            if epoch > PRETRAIN_EPOCHS:
+                adversarial_loss = bce_loss(d_net(fake_img), real_labels)
+                target_unit_range = vgg_normalize((target + 1) / 2)  # rescale in [0,1] then to VGG training set range
+                fake_unit_range = vgg_normalize((fake_img + 1) / 2)  # rescale in [0,1] then to VGG training set range
 
-            content_loss = mse_loss(feature_extractor(target_unit_range), feature_extractor(fake_unit_range))
+                content_loss = mse_loss(feature_extractor(target_unit_range), feature_extractor(fake_unit_range))
+                g_total_loss = content_loss + 1e-3 * adversarial_loss
+            else:
+                content_loss = mse_loss(fake_img, target)
+                g_total_loss = content_loss
 
-            g_total_loss = content_loss + 1e-3 * adversarial_loss
             g_total_loss.backward()
             g_optimizer.step()
             g_scheduler.step()
 
-            running_results['g_epoch_total_loss'] += g_total_loss.item() * batch_size
-            running_results['d_epoch_total_loss'] += d_total_loss.item() * batch_size
-            running_results['d_epoch_real_mean'] += d_real_mean.item() * batch_size
-            running_results['d_epoch_fake_mean'] += d_fake_mean.item() * batch_size
+            running_results['g_epoch_total_loss'] += g_total_loss.to('cpu', non_blocking=True) * batch_size
+            if epoch > PRETRAIN_EPOCHS:
+                running_results['d_epoch_total_loss'] += d_total_loss.to('cpu', non_blocking=True) * batch_size
+                running_results['d_epoch_real_mean'] += d_real_mean.to('cpu', non_blocking=True) * batch_size
+                running_results['d_epoch_fake_mean'] += d_fake_mean.to('cpu', non_blocking=True) * batch_size
 
             train_bar.set_description(
                 desc=f'[{epoch}/{NUM_EPOCHS}] '
