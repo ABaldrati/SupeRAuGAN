@@ -189,12 +189,6 @@ if __name__ == '__main__':
                     image_grid = utils.make_grid(image_batch, nrow=3, padding=5)
                     writer.add_image(f'epoch_{epoch}_index_{index}.png', image_grid)
 
-        # save model parameters
-        models_path = results_folder / "saved_models"
-        models_path.mkdir(exist_ok=True)
-        torch.save(g_net.state_dict(), str(models_path / f'epoch_{epoch}_g_net.pth'))
-        torch.save(d_net.state_dict(), str(models_path / f'epoch_{epoch}_d_net.pth'))
-
         # save loss / scores / psnr /ssim
         results['d_total_loss'].append(running_results['d_epoch_total_loss'] / running_results['batch_sizes'])
         results['g_total_loss'].append(running_results['g_epoch_total_loss'] / running_results['batch_sizes'])
