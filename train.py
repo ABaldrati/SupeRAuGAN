@@ -211,8 +211,9 @@ if __name__ == '__main__':
         if epoch % VALIDATION_FREQUENCY == 1 or VALIDATION_FREQUENCY == 1:
             data_frame = pd.DataFrame(
                 data={'d_total_loss': results['d_total_loss'], 'g_total_loss': results['g_total_loss'],
-                      'd_real_mean': results['d_real_mean'],
-                      'd_fake_mean': results['d_fake_mean'], 'PSNR': results['psnr'], 'SSIM': results['ssim']},
+                      'g_adv_loss': results['g_adv_loss'], 'g_content_loss': results['g_content_loss'],
+                      'd_real_mean': results['d_real_mean'], 'd_fake_mean': results['d_fake_mean'],
+                      'PSNR': results['psnr'], 'SSIM': results['ssim']},
                 index=range(1, epoch + 1))
             data_frame.to_csv(str(results_folder / f"train_results.csv"), index_label='Epoch')
 
