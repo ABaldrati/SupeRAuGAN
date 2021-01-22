@@ -166,7 +166,7 @@ if __name__ == '__main__':
                         hr = hr.cuda()
                         lr = lr.cuda()
 
-                    sr = g_net(lr)
+                    sr = g_net((lr * 2) - 1)
                     sr = ((sr + 1) / 2)  # rescale values from [-1,1] to [0,1]
 
                     batch_mse = ((sr - hr) ** 2).data.mean()  # Pixel-wise MSE
