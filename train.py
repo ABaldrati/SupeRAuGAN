@@ -67,12 +67,13 @@ if __name__ == '__main__':
         mse_loss.cuda()
         feature_extractor.cuda()
 
-    results = {'d_total_loss': [], 'g_total_loss': [], 'd_real_mean': [], 'd_fake_mean': [], 'psnr': [], 'ssim': []}
+    results = {'d_total_loss': [], 'g_total_loss': [], 'g_adv_loss': [], 'g_content_loss': [], 'd_real_mean': [],
+               'd_fake_mean': [], 'psnr': [], 'ssim': []}
 
     for epoch in range(1, PRETRAIN_EPOCHS + NUM_EPOCHS + 1):
-        train_bar = tqdm(train_loader, ncols=160)
-        running_results = {'batch_sizes': 0, 'd_epoch_total_loss': 0, 'g_epoch_total_loss': 0, 'd_epoch_real_mean': 0,
-                           'd_epoch_fake_mean': 0}
+        train_bar = tqdm(train_loader, ncols=200)
+        running_results = {'batch_sizes': 0, 'd_epoch_total_loss': 0, 'g_epoch_total_loss': 0, 'g_epoch_adv_loss': 0,
+                           'g_epoch_content_loss': 0, 'd_epoch_real_mean': 0, 'd_epoch_fake_mean': 0}
 
         g_net.train()
         d_net.train()
@@ -129,6 +130,8 @@ if __name__ == '__main__':
             g_scheduler.step()
 
             running_results['g_epoch_total_loss'] += g_total_loss.to('cpu', non_blocking=True) * batch_size
+            running_results['g_epoch_adv_loss'] += adversarial_loss.to('cpu', non_blocking=True) * batch_size
+            running_results['g_epoch_content_loss'] += content_loss.to('cpu', non_blocking=True) * batch_size
             if epoch > PRETRAIN_EPOCHS:
                 running_results['d_epoch_total_loss'] += d_total_loss.to('cpu', non_blocking=True) * batch_size
                 running_results['d_epoch_real_mean'] += d_real_mean.to('cpu', non_blocking=True) * batch_size
@@ -138,6 +141,8 @@ if __name__ == '__main__':
                 desc=f'[{epoch}/{NUM_EPOCHS}] '
                      f'Loss_D: {running_results["d_epoch_total_loss"] / running_results["batch_sizes"]:.4f} '
                      f'Loss_G: {running_results["g_epoch_total_loss"] / running_results["batch_sizes"]:.4f} '
+                     f'Loss_G_adv: {running_results["g_epoch_adv_loss"] / running_results["batch_sizes"]:.4f} '
+                     f'Loss_G_content: {running_results["g_epoch_content_loss"] / running_results["batch_sizes"]:.4f} '
                      f'D(x): {running_results["d_epoch_real_mean"] / running_results["batch_sizes"]:.4f} '
                      f'D(G(z)): {running_results["d_epoch_fake_mean"] / running_results["batch_sizes"]:.4f}')
 
@@ -192,6 +197,8 @@ if __name__ == '__main__':
         # save loss / scores / psnr /ssim
         results['d_total_loss'].append(running_results['d_epoch_total_loss'] / running_results['batch_sizes'])
         results['g_total_loss'].append(running_results['g_epoch_total_loss'] / running_results['batch_sizes'])
+        results['g_adv_loss'].append(running_results['g_epoch_adv_loss'] / running_results['batch_sizes'])
+        results['g_content_loss'].append(running_results['g_epoch_content_loss'] / running_results['batch_sizes'])
         results['d_real_mean'].append(running_results['d_epoch_real_mean'] / running_results['batch_sizes'])
         results['d_fake_mean'].append(running_results['d_epoch_fake_mean'] / running_results['batch_sizes'])
         results['psnr'].append(val_results['epoch_avg_psnr'])
