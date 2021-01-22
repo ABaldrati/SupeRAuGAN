@@ -220,5 +220,10 @@ if __name__ == '__main__':
             # save model parameters
             models_path = results_folder / "saved_models"
             models_path.mkdir(exist_ok=True)
-            torch.save(g_net.state_dict(), str(models_path / f'epoch_{epoch}_g_net.pth'))
-            torch.save(d_net.state_dict(), str(models_path / f'epoch_{epoch}_d_net.pth'))
+            torch.save({
+                'epoch': epoch,
+                'g_net': g_net.state_dict(),
+                'd_net': g_net.state_dict(),
+                'g_optimizer': g_optimizer.state_dict(),
+                'd_optimizer': d_optimizer.state_dict(),
+            }, str(models_path / f'epoch_{epoch}.tar'))
