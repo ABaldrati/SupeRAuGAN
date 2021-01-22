@@ -115,13 +115,14 @@ if __name__ == '__main__':
 
             fake_img = g_net(data)
             if epoch > PRETRAIN_EPOCHS:
-                adversarial_loss = bce_loss(d_net(fake_img), real_labels)
+                adversarial_loss = bce_loss(d_net(fake_img), real_labels) * 1e-3
                 target_unit_range = vgg_normalize((target + 1) / 2)  # rescale in [0,1] then to VGG training set range
                 fake_unit_range = vgg_normalize((fake_img + 1) / 2)  # rescale in [0,1] then to VGG training set range
 
                 content_loss = mse_loss(feature_extractor(target_unit_range), feature_extractor(fake_unit_range))
-                g_total_loss = content_loss + 1e-3 * adversarial_loss
+                g_total_loss = content_loss + adversarial_loss
             else:
+                adversarial_loss = 0
                 content_loss = mse_loss(fake_img, target)
                 g_total_loss = content_loss
 
