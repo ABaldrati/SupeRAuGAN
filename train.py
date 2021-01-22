@@ -38,7 +38,7 @@ if __name__ == '__main__':
     writer = SummaryWriter(str(results_folder / "tensorboard_log"))
 
     g_net = Generator(n_residual_blocks=16, upsample_factor=UPSCALE_FACTOR)
-    d_net = Discriminator()
+    d_net = Discriminator(patch_size=PATCH_SIZE)
 
     if torch.cuda.is_available():
         torch.backends.cudnn.benchmark = True
