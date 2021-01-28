@@ -1,9 +1,16 @@
+import math
 from os import listdir
 from os.path import join
+from random import choice, uniform
 
+import matplotlib.pyplot as plt
+import torch
 from PIL import Image
+from numpy.random.mtrand import lognormal, normal
 from torch.utils.data.dataset import Dataset
 from torchvision.transforms import Compose, RandomCrop, ToTensor, ToPILImage, CenterCrop, Resize, Normalize
+from torchvision.transforms.functional import hflip, affine, resize, adjust_brightness, adjust_contrast, to_tensor, \
+    adjust_hue, adjust_saturation, to_pil_image, pad, center_crop
 
 
 def is_image_file(filename):
@@ -105,3 +112,137 @@ class TestDatasetFromFolder(Dataset):
 
     def __len__(self):
         return len(self.lr_filenames)
+
+
+def rgb_to_ycbcr(image: torch.Tensor) -> torch.Tensor:
+    r"""Convert an RGB image to YCbCr.
+
+    Args:
+        image (torch.Tensor): RGB Image to be converted to YCbCr.
+
+    Returns:
+        torch.Tensor: YCbCr version of the image.
+    """
+
+    if not torch.is_tensor(image):
+        raise TypeError("Input type is not a torch.Tensor. Got {}".format(
+            type(image)))
+
+    if len(image.shape) < 3 or image.shape[-3] != 3:
+        raise ValueError("Input size must have a shape of (*, 3, H, W). Got {}"
+                         .format(image.shape))
+
+    r: torch.Tensor = image[..., 0, :, :]
+    g: torch.Tensor = image[..., 1, :, :]
+    b: torch.Tensor = image[..., 2, :, :]
+
+    delta = .5
+    y: torch.Tensor = .299 * r + .587 * g + .114 * b
+    cb: torch.Tensor = (b - y) * .564 + delta
+    cr: torch.Tensor = (r - y) * .713 + delta
+    return torch.stack((y, cb, cr), -3)
+
+
+def ycbcr_to_rgb(image: torch.Tensor) -> torch.Tensor:
+    r"""Convert an YCbCr image to RGB.
+
+    The image data is assumed to be in the range of (0, 1).
+
+    Args:
+        image (torch.Tensor): YCbCr Image to be converted to RGB with shape :math:`(*, 3, H, W)`.
+
+    Returns:
+        torch.Tensor: RGB version of the image with shape :math:`(*, 3, H, W)`.
+
+    Examples:
+        >>> input = torch.rand(2, 3, 4, 5)
+        >>> output = ycbcr_to_rgb(input)  # 2x3x4x5
+    """
+    if not isinstance(image, torch.Tensor):
+        raise TypeError("Input type is not a torch.Tensor. Got {}".format(
+            type(image)))
+
+    if len(image.shape) < 3 or image.shape[-3] != 3:
+        raise ValueError("Input size must have a shape of (*, 3, H, W). Got {}"
+                         .format(image.shape))
+
+    y: torch.Tensor = image[..., 0, :, :]
+    cb: torch.Tensor = image[..., 1, :, :]
+    cr: torch.Tensor = image[..., 2, :, :]
+
+    delta: float = 0.5
+    cb_shifted: torch.Tensor = cb - delta
+    cr_shifted: torch.Tensor = cr - delta
+
+    r: torch.Tensor = y + 1.403 * cr_shifted
+    g: torch.Tensor = y - 0.714 * cr_shifted - 0.344 * cb_shifted
+    b: torch.Tensor = y + 1.773 * cb_shifted
+    return torch.stack([r, g, b], -3)
+
+
+def augment_batch(images: torch.Tensor, p: float) -> torch.Tensor:
+    batch_size, channels, h_orig, w_orig = images.size()
+    images = pad(images, padding=(w_orig - 1, h_orig - 1, w_orig - 1, h_orig - 1), padding_mode='reflect')
+    batch_size, channels, h, w = images.size()
+    mask = (torch.rand(batch_size) < p).logical_and(torch.rand(batch_size) < 0.5)
+    images[mask] = hflip(images[mask])
+    output_images = torch.zeros((batch_size, channels, h_orig, w_orig))
+
+    translate = (0, 0)
+    angle_step = choice([0, 1, 2, 3])
+    angle = -90 * angle_step
+
+    scale_iso_mask = torch.rand(batch_size) < p
+    scale_iso = lognormal(0, 0.2 * math.log(2))
+    scale = (scale_iso, scale_iso)
+
+    p_rot = 1 - math.sqrt(1 - p)
+    rot_mask = torch.rand(batch_size) < p_rot
+    theta = uniform(-180, 180)
+    angle += theta
+
+    scale_mask = torch.rand(batch_size) < p
+    scale_factor = lognormal(0, 0.2 * math.log(2))
+    scale_x, scale_y = scale
+    scale = (scale_x * scale_factor, scale_y / scale_factor)
+    new_size = (int(h * scale[0]), int(w * scale[1]))
+
+    if torch.any(rot_mask):
+        affine_transformed = affine(images[rot_mask], angle=angle, translate=list(translate), shear=[0., 0.], scale=1)
+        images[rot_mask] = affine_transformed
+
+    resize_mask = scale_iso_mask.logical_and(scale_mask)
+    resized_images = resize(images[resize_mask], list(new_size))
+    output_images[resize_mask.logical_not()] = center_crop(images[resize_mask.logical_not()], (h_orig, w_orig))
+    output_images[resize_mask] = center_crop(resized_images, (h_orig, w_orig))
+
+    images = output_images
+
+    mask = torch.rand(batch_size) < p
+    brightness = normal(1, 0.2)
+    images[mask] = adjust_brightness(images[mask], brightness)
+
+    mask = torch.rand(batch_size) < p
+    contrast = lognormal(0, (0.5 * math.log(2)))
+    images[mask] = adjust_contrast(images[mask], contrast)
+
+    mask = torch.rand(batch_size) < p
+    image_data = rgb_to_ycbcr(images[mask])
+    image_data[..., 0, :, :] = (1 - image_data[..., 0, :, :])
+    images[mask] = ycbcr_to_rgb(image_data)
+
+    mask = torch.rand(batch_size) < p
+    if torch.any(mask):
+        hue_factor = uniform(-0.5, 0.5)
+        images[mask] = adjust_hue(images[mask], hue_factor)
+
+    mask = torch.rand(batch_size) < p
+    saturation = lognormal(0, math.log(2))
+    images[mask] = adjust_saturation(images[mask], saturation)
+
+    mask = torch.rand(batch_size) < p
+    std_dev = abs(normal(0, 0.1))
+    noise_images = torch.randn_like(images) * std_dev
+    images[mask] += noise_images.clamp(0, 1)
+
+    return images
