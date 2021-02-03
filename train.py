@@ -15,11 +15,12 @@ from tqdm import tqdm
 from data_utils import TrainDatasetFromFolder, ValDatasetFromFolder, display_transform
 from model import Generator, Discriminator
 
-NUM_EPOCHS = int(2e5)
-PRETRAIN_EPOCHS = 0
-PATCH_SIZE = 96
+NUM_EPOCHS = 30
+PRETRAIN_EPOCHS = 5
+PATCH_SIZE = 128
 UPSCALE_FACTOR = 4
-VALIDATION_FREQUENCY = 50
+NUM_RESIDUAL_BLOCKS = 16
+VALIDATION_FREQUENCY = 1
 NUM_LOGGED_VALIDATION_IMAGES = 30
 
 if __name__ == '__main__':
@@ -32,8 +33,7 @@ if __name__ == '__main__':
     results_folder = Path(f"results_{training_start}_CS:{PATCH_SIZE}_US:{UPSCALE_FACTOR}x")
     results_folder.mkdir(exist_ok=True)
     writer = SummaryWriter(str(results_folder / "tensorboard_log"))
-
-    g_net = Generator(n_residual_blocks=16, upsample_factor=UPSCALE_FACTOR)
+    g_net = Generator(n_residual_blocks=NUM_RESIDUAL_BLOCKS, upsample_factor=UPSCALE_FACTOR)
     d_net = Discriminator(patch_size=PATCH_SIZE)
     if torch.cuda.is_available():
         torch.backends.cudnn.benchmark = True
