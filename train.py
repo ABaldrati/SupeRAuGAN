@@ -43,9 +43,6 @@ if __name__ == '__main__':
     g_optimizer = optim.Adam(g_net.parameters(), lr=1e-4)
     d_optimizer = optim.Adam(d_net.parameters(), lr=1e-4)
 
-    g_scheduler = StepLR(g_optimizer, step_size=NUM_EPOCHS // 2, gamma=0.1)
-    d_scheduler = StepLR(d_optimizer, step_size=NUM_EPOCHS // 2, gamma=0.1)
-
     bce_loss = BCELoss()
     mse_loss = MSELoss()
 
@@ -90,7 +87,6 @@ if __name__ == '__main__':
                 d_total_loss = d_real_output_loss + d_fake_output_loss
                 d_total_loss.backward()
                 d_optimizer.step()
-                d_scheduler.step()
 
                 d_real_mean = d_real_output.mean()
                 d_fake_mean = d_fake_output.mean()
@@ -110,7 +106,6 @@ if __name__ == '__main__':
 
             g_total_loss.backward()
             g_optimizer.step()
-            g_scheduler.step()
 
             running_results['g_epoch_total_loss'] += g_total_loss.to('cpu', non_blocking=True) * batch_size
             running_results['g_epoch_adv_loss'] += adversarial_loss.to('cpu', non_blocking=True) * batch_size
