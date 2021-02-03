@@ -36,10 +36,9 @@ def main():
     writer = SummaryWriter(str(results_folder / "tensorboard_log"))
     g_net = Generator(n_residual_blocks=NUM_RESIDUAL_BLOCKS, upsample_factor=UPSCALE_FACTOR)
     d_net = Discriminator(patch_size=PATCH_SIZE)
-    if torch.cuda.is_available():
-        torch.backends.cudnn.benchmark = True
-        g_net.cuda()
-        d_net.cuda()
+
+    g_net.to(device=device)
+    d_net.cuda(device=device)
 
     g_optimizer = optim.Adam(g_net.parameters(), lr=1e-4)
     d_optimizer = optim.Adam(d_net.parameters(), lr=1e-4)
@@ -47,9 +46,8 @@ def main():
     bce_loss = BCELoss()
     mse_loss = MSELoss()
 
-    if torch.cuda.is_available():
-        bce_loss.cuda()
-        mse_loss.cuda()
+    bce_loss.to(device=device)
+    mse_loss.cuda(device=device)
     results = {'d_total_loss': [], 'g_total_loss': [], 'g_adv_loss': [], 'g_content_loss': [], 'd_real_mean': [],
                'd_fake_mean': [], 'psnr': [], 'ssim': []}
     augment_probability = 0
@@ -65,15 +63,11 @@ def main():
         for data, target in train_bar:
             batch_size = data.size(0)
             running_results["batch_sizes"] += batch_size
+            target = target.cuda()
+            data = data.cuda()
+            real_labels = torch.ones(batch_size, device=device)
+            fake_labels = torch.zeros(batch_size, device=device)
 
-            if torch.cuda.is_available():
-                target = target.cuda()
-                data = data.cuda()
-                real_labels = torch.ones(batch_size, device=torch.device('cuda'))
-                fake_labels = torch.zeros(batch_size, device=torch.device('cuda'))
-            else:
-                real_labels = torch.ones(batch_size)
-                fake_labels = torch.zeros(batch_size)
 
             if epoch > PRETRAIN_EPOCHS:
                 # Discriminator training
@@ -149,9 +143,8 @@ def main():
                 for lr, val_hr_restore, hr in val_bar:
                     batch_size = lr.size(0)
                     val_results['batch_sizes'] += batch_size
-                    if torch.cuda.is_available():
-                        hr = hr.cuda()
-                        lr = lr.cuda()
+                    hr = hr.to(device=device)
+                    lr = lr.cuda(device=device)
 
                     sr = g_net(lr)
                     sr = torch.clamp(sr, 0., 1.)
