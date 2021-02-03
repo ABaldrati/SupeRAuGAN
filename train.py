@@ -25,9 +25,9 @@ NUM_LOGGED_VALIDATION_IMAGES = 30
 
 if __name__ == '__main__':
     training_start = datetime.datetime.now().isoformat()
-    train_set = TrainDatasetFromFolder('data/DIV2K_train_HR', patch_size=PATCH_SIZE, upscale_factor=UPSCALE_FACTOR)
-    val_set = ValDatasetFromFolder('data/DIV2K_valid_HR', upscale_factor=UPSCALE_FACTOR)
-    train_loader = DataLoader(dataset=train_set, num_workers=4, batch_size=64, shuffle=True, pin_memory=True)
+    train_set = TrainDatasetFromFolder('data/celebA/train_set', patch_size=PATCH_SIZE, upscale_factor=UPSCALE_FACTOR)
+    val_set = ValDatasetFromFolder('data/celebA/val_set', upscale_factor=UPSCALE_FACTOR)
+    train_loader = DataLoader(dataset=train_set, num_workers=4, batch_size=32, shuffle=True, pin_memory=True)
     val_loader = DataLoader(dataset=val_set, num_workers=4, batch_size=1, shuffle=False, pin_memory=True)
 
     results_folder = Path(f"results_{training_start}_CS:{PATCH_SIZE}_US:{UPSCALE_FACTOR}x")
