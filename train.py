@@ -24,6 +24,13 @@ VALIDATION_FREQUENCY = 1
 NUM_LOGGED_VALIDATION_IMAGES = 30
 AUGMENT_PROB_TARGET = 0.6
 
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+    torch.backends.cudnn.benchmark = True
+else:
+    device = torch.device("cpu")
+
+
 def main():
     training_start = datetime.datetime.now().isoformat()
     train_set = TrainDatasetFromFolder('data/celebA/train_set', patch_size=PATCH_SIZE, upscale_factor=UPSCALE_FACTOR)
