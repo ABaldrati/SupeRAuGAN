@@ -6,13 +6,10 @@ import pandas as pd
 import pytorch_ssim
 import torch
 import torchvision.utils as utils
-from torch import optim, nn
+from torch import optim
 from torch.nn import BCELoss, MSELoss
-from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from torchvision.models import vgg19
-from torchvision.transforms import transforms
 from tqdm import tqdm
 
 from data_utils import TrainDatasetFromFolder, ValDatasetFromFolder, display_transform
@@ -34,19 +31,14 @@ if __name__ == '__main__':
 
     results_folder = Path(f"results_{training_start}_CS:{PATCH_SIZE}_US:{UPSCALE_FACTOR}x")
     results_folder.mkdir(exist_ok=True)
-
     writer = SummaryWriter(str(results_folder / "tensorboard_log"))
 
     g_net = Generator(n_residual_blocks=16, upsample_factor=UPSCALE_FACTOR)
     d_net = Discriminator(patch_size=PATCH_SIZE)
-
     if torch.cuda.is_available():
         torch.backends.cudnn.benchmark = True
         g_net.cuda()
         d_net.cuda()
-
-    vgg_normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                         std=[0.229, 0.224, 0.225])  # vgg pretrained network use this normalization
 
     g_optimizer = optim.Adam(g_net.parameters(), lr=1e-4)
     d_optimizer = optim.Adam(d_net.parameters(), lr=1e-4)
@@ -57,16 +49,9 @@ if __name__ == '__main__':
     bce_loss = BCELoss()
     mse_loss = MSELoss()
 
-    vgg = vgg19(pretrained=True)
-    feature_extractor = nn.Sequential(*list(vgg.features)[:36]).eval()
-    for param in feature_extractor.parameters():
-        param.requires_grad = False
-
     if torch.cuda.is_available():
         bce_loss.cuda()
         mse_loss.cuda()
-        feature_extractor.cuda()
-
     results = {'d_total_loss': [], 'g_total_loss': [], 'g_adv_loss': [], 'g_content_loss': [], 'd_real_mean': [],
                'd_fake_mean': [], 'psnr': [], 'ssim': []}
 
@@ -116,11 +101,7 @@ if __name__ == '__main__':
             fake_img = g_net(data)
             if epoch > PRETRAIN_EPOCHS:
                 adversarial_loss = bce_loss(d_net(fake_img), real_labels) * 1e-3
-                target_unit_range = vgg_normalize(target)  # rescale in [0,1] then to VGG training set range
-                fake_unit_range = vgg_normalize(fake_img)  # rescale in [0,1] then to VGG training set range
-
-                content_loss = mse_loss(feature_extractor(target_unit_range), feature_extractor(fake_unit_range))
-
+                content_loss = mse_loss(fake_img, target)
                 g_total_loss = content_loss + adversarial_loss
             else:
                 adversarial_loss = 0
