@@ -78,7 +78,7 @@ if __name__ == '__main__':
                 d_optimizer.zero_grad(set_to_none=True)
 
                 d_real_output = d_net(target)
-                d_real_output_loss = bce_loss(d_real_output, real_labels)
+                d_real_output_loss = bce_loss(d_real_output, real_labels * 0.9)
 
                 fake_img = g_net(data)
                 d_fake_output = d_net(fake_img)
