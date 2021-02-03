@@ -100,7 +100,8 @@ def main():
                 content_loss = mse_loss(fake_img, target)
                 g_total_loss = content_loss + adversarial_loss
             else:
-                adversarial_loss = 0
+                adversarial_loss = mse_loss(torch.zeros(1, device='cuda'),
+                                            torch.zeros(1, device='cuda'))  # Logging purposes, it is always zero
                 content_loss = mse_loss(fake_img, target)
                 g_total_loss = content_loss
 
