@@ -22,6 +22,7 @@ UPSCALE_FACTOR = 4
 NUM_RESIDUAL_BLOCKS = 16
 VALIDATION_FREQUENCY = 1
 NUM_LOGGED_VALIDATION_IMAGES = 30
+AUGMENT_PROB_TARGET = 0.6
 
 def main():
     training_start = datetime.datetime.now().isoformat()
@@ -51,6 +52,7 @@ def main():
         mse_loss.cuda()
     results = {'d_total_loss': [], 'g_total_loss': [], 'g_adv_loss': [], 'g_content_loss': [], 'd_real_mean': [],
                'd_fake_mean': [], 'psnr': [], 'ssim': []}
+    augment_probability = 0
 
     for epoch in range(1, PRETRAIN_EPOCHS + NUM_EPOCHS + 1):
         train_bar = tqdm(train_loader, ncols=200)
@@ -108,13 +110,20 @@ def main():
             g_total_loss.backward()
             g_optimizer.step()
 
-            running_results['g_epoch_total_loss'] += g_total_loss.to('cpu', non_blocking=True) * batch_size
-            running_results['g_epoch_adv_loss'] += adversarial_loss.to('cpu', non_blocking=True) * batch_size
-            running_results['g_epoch_content_loss'] += content_loss.to('cpu', non_blocking=True) * batch_size
             if epoch > PRETRAIN_EPOCHS:
-                running_results['d_epoch_total_loss'] += d_total_loss.to('cpu', non_blocking=True) * batch_size
-                running_results['d_epoch_real_mean'] += d_real_mean.to('cpu', non_blocking=True) * batch_size
-                running_results['d_epoch_fake_mean'] += d_fake_mean.to('cpu', non_blocking=True) * batch_size
+                rt = torch.mean(torch.sign(d_real_output - 0.5))
+                if rt > AUGMENT_PROB_TARGET:
+                    augment_probability = min(1., augment_probability + 1e-3)
+                else:
+                    augment_probability = max(0., augment_probability - 1e-3)
+
+            running_results['g_epoch_total_loss'] += g_total_loss.to('cpu', non_blocking=True).detach() * batch_size
+            running_results['g_epoch_adv_loss'] += adversarial_loss.to('cpu', non_blocking=True).detach() * batch_size
+            running_results['g_epoch_content_loss'] += content_loss.to('cpu', non_blocking=True).detach() * batch_size
+            if epoch > PRETRAIN_EPOCHS:
+                running_results['d_epoch_total_loss'] += d_total_loss.to('cpu', non_blocking=True).detach() * batch_size
+                running_results['d_epoch_real_mean'] += d_real_mean.to('cpu', non_blocking=True).detach() * batch_size
+                running_results['d_epoch_fake_mean'] += d_fake_mean.to('cpu', non_blocking=True).detach() * batch_size
 
             train_bar.set_description(
                 desc=f'[{epoch}/{NUM_EPOCHS}] '
