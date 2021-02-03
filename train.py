@@ -23,7 +23,7 @@ NUM_RESIDUAL_BLOCKS = 16
 VALIDATION_FREQUENCY = 1
 NUM_LOGGED_VALIDATION_IMAGES = 30
 
-if __name__ == '__main__':
+def main():
     training_start = datetime.datetime.now().isoformat()
     train_set = TrainDatasetFromFolder('data/celebA/train_set', patch_size=PATCH_SIZE, upscale_factor=UPSCALE_FACTOR)
     val_set = ValDatasetFromFolder('data/celebA/val_set', upscale_factor=UPSCALE_FACTOR)
@@ -203,3 +203,7 @@ if __name__ == '__main__':
                 'g_optimizer': g_optimizer.state_dict(),
                 'd_optimizer': d_optimizer.state_dict(),
             }, str(models_path / f'epoch_{epoch}.tar'))
+
+
+if __name__ == '__main__':
+    main()
