@@ -116,10 +116,11 @@ if __name__ == '__main__':
             fake_img = g_net(data)
             if epoch > PRETRAIN_EPOCHS:
                 adversarial_loss = bce_loss(d_net(fake_img), real_labels) * 1e-3
-                target_unit_range = vgg_normalize((target + 1) / 2)  # rescale in [0,1] then to VGG training set range
-                fake_unit_range = vgg_normalize((fake_img + 1) / 2)  # rescale in [0,1] then to VGG training set range
+                target_unit_range = vgg_normalize(target)  # rescale in [0,1] then to VGG training set range
+                fake_unit_range = vgg_normalize(fake_img)  # rescale in [0,1] then to VGG training set range
 
                 content_loss = mse_loss(feature_extractor(target_unit_range), feature_extractor(fake_unit_range))
+
                 g_total_loss = content_loss + adversarial_loss
             else:
                 adversarial_loss = 0
@@ -166,9 +167,8 @@ if __name__ == '__main__':
                         hr = hr.cuda()
                         lr = lr.cuda()
 
-                    sr = g_net((lr * 2) - 1)
-                    sr = ((sr + 1) / 2)  # rescale values from [-1,1] to [0,1]
-
+                    sr = g_net(lr)
+                    sr = torch.clamp(sr, 0., 1.)
                     batch_mse = ((sr - hr) ** 2).data.mean()  # Pixel-wise MSE
                     val_results['epoch_mse'] += batch_mse * batch_size
                     batch_ssim = pytorch_ssim.ssim(sr, hr).item()

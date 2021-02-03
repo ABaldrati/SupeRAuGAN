@@ -25,7 +25,6 @@ def train_hr_transform(crop_size):
     return Compose([
         RandomCrop(crop_size),
         ToTensor(),
-        Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
 
 
@@ -34,7 +33,6 @@ def train_lr_transform(crop_size, upscale_factor):
         ToPILImage(),
         Resize(crop_size // upscale_factor, interpolation=Image.BICUBIC),
         ToTensor(),
-        Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
 
 
