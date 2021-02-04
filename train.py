@@ -24,6 +24,8 @@ NUM_RESIDUAL_BLOCKS = 16
 VALIDATION_FREQUENCY = 1
 NUM_LOGGED_VALIDATION_IMAGES = 30
 AUGMENT_PROB_TARGET = 0.6
+ADV_LOSS_BALANCER = 2e-4
+LABEL_SMOOTHING_FACTOR = 0.9
 VAL_DATASET_PERCENTAGE = 5
 
 if torch.cuda.is_available():
@@ -80,13 +82,12 @@ def main():
             real_labels = torch.ones(batch_size, device=device)
             fake_labels = torch.zeros(batch_size, device=device)
 
-
             if epoch > PRETRAIN_EPOCHS:
                 # Discriminator training
                 d_optimizer.zero_grad(set_to_none=True)
 
                 d_real_output = d_net(target)
-                d_real_output_loss = bce_loss(d_real_output, real_labels * 0.9)
+                d_real_output_loss = bce_loss(d_real_output, real_labels * LABEL_SMOOTHING_FACTOR)
 
                 fake_img = g_net(data)
                 d_fake_output = d_net(fake_img)
@@ -104,7 +105,7 @@ def main():
 
             fake_img = g_net(data)
             if epoch > PRETRAIN_EPOCHS:
-                adversarial_loss = bce_loss(d_net(fake_img), real_labels) * 1e-3
+                adversarial_loss = bce_loss(d_net(fake_img), real_labels) * ADV_LOSS_BALANCER
                 content_loss = mse_loss(fake_img, target)
                 g_total_loss = content_loss + adversarial_loss
             else:
@@ -132,7 +133,7 @@ def main():
                 running_results['d_epoch_fake_mean'] += d_fake_mean.to('cpu', non_blocking=True).detach() * batch_size
 
             train_bar.set_description(
-                desc=f'[{epoch}/{NUM_EPOCHS}] '
+                desc=f'[{epoch}/{NUM_EPOCHS + PRETRAIN_EPOCHS}] '
                      f'Loss_D: {running_results["d_epoch_total_loss"] / running_results["batch_sizes"]:.4f} '
                      f'Loss_G: {running_results["g_epoch_total_loss"] / running_results["batch_sizes"]:.4f} '
                      f'Loss_G_adv: {running_results["g_epoch_adv_loss"] / running_results["batch_sizes"]:.4f} '
