@@ -2,13 +2,14 @@ import datetime
 from math import log10
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytorch_ssim
 import torch
 import torchvision.utils as utils
 from torch import optim
 from torch.nn import BCELoss, MSELoss
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
@@ -23,6 +24,7 @@ NUM_RESIDUAL_BLOCKS = 16
 VALIDATION_FREQUENCY = 1
 NUM_LOGGED_VALIDATION_IMAGES = 30
 AUGMENT_PROB_TARGET = 0.6
+VAL_DATASET_PERCENTAGE = 5
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -35,6 +37,9 @@ def main():
     training_start = datetime.datetime.now().isoformat()
     train_set = TrainDatasetFromFolder('data/celebA/train_set', patch_size=PATCH_SIZE, upscale_factor=UPSCALE_FACTOR)
     val_set = ValDatasetFromFolder('data/celebA/val_set', upscale_factor=UPSCALE_FACTOR)
+    len_val_set = len(val_set)
+    val_set = Subset(val_set, list(
+        np.random.choice(np.arange(len_val_set), int(len_val_set * VAL_DATASET_PERCENTAGE / 100), False)))
     train_loader = DataLoader(dataset=train_set, num_workers=4, batch_size=32, shuffle=True, pin_memory=True)
     val_loader = DataLoader(dataset=val_set, num_workers=4, batch_size=1, shuffle=False, pin_memory=True)
 
