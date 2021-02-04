@@ -45,7 +45,7 @@ def main():
     d_net = Discriminator(patch_size=PATCH_SIZE)
 
     g_net.to(device=device)
-    d_net.cuda(device=device)
+    d_net.to(device=device)
 
     g_optimizer = optim.Adam(g_net.parameters(), lr=1e-4)
     d_optimizer = optim.Adam(d_net.parameters(), lr=1e-4)
@@ -54,7 +54,7 @@ def main():
     mse_loss = MSELoss()
 
     bce_loss.to(device=device)
-    mse_loss.cuda(device=device)
+    mse_loss.to(device=device)
     results = {'d_total_loss': [], 'g_total_loss': [], 'g_adv_loss': [], 'g_content_loss': [], 'd_real_mean': [],
                'd_fake_mean': [], 'psnr': [], 'ssim': []}
     augment_probability = 0
@@ -70,8 +70,8 @@ def main():
         for data, target in train_bar:
             batch_size = data.size(0)
             running_results["batch_sizes"] += batch_size
-            target = target.cuda()
-            data = data.cuda()
+            target = target.to(device)
+            data = data.to(device)
             real_labels = torch.ones(batch_size, device=device)
             fake_labels = torch.zeros(batch_size, device=device)
 
@@ -103,8 +103,8 @@ def main():
                 content_loss = mse_loss(fake_img, target)
                 g_total_loss = content_loss + adversarial_loss
             else:
-                adversarial_loss = mse_loss(torch.zeros(1, device='cuda'),
-                                            torch.zeros(1, device='cuda'))  # Logging purposes, it is always zero
+                adversarial_loss = mse_loss(torch.zeros(1, device=device),
+                                            torch.zeros(1, device=device))  # Logging purposes, it is always zero
                 content_loss = mse_loss(fake_img, target)
                 g_total_loss = content_loss
 
@@ -151,7 +151,7 @@ def main():
                     batch_size = lr.size(0)
                     val_results['batch_sizes'] += batch_size
                     hr = hr.to(device=device)
-                    lr = lr.cuda(device=device)
+                    lr = lr.to(device=device)
 
                     sr = g_net(lr)
                     sr = torch.clamp(sr, 0., 1.)
