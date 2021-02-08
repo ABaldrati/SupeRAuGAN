@@ -184,7 +184,7 @@ def augment_batch(images: torch.Tensor, p: float) -> torch.Tensor:
     batch_size, channels, h, w = images.size()
     mask = (torch.rand(batch_size) < p).logical_and(torch.rand(batch_size) < 0.5)
     images[mask] = hflip(images[mask])
-    output_images = torch.zeros((batch_size, channels, h_orig, w_orig))
+    output_images = images.new_zeros((batch_size, channels, h_orig, w_orig))
 
     translate = (0, 0)
     angle_step = choice([0, 1, 2, 3])
@@ -240,7 +240,7 @@ def augment_batch(images: torch.Tensor, p: float) -> torch.Tensor:
 
     mask = torch.rand(batch_size) < p
     std_dev = abs(normal(0, 0.1))
-    noise_images = torch.randn_like(images) * std_dev
+    noise_images = torch.randn_like(images[mask]) * std_dev
     images[mask] += noise_images.clamp(0, 1)
 
     return images
