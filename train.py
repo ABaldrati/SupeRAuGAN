@@ -16,15 +16,15 @@ from tqdm import tqdm
 from data_utils import TrainDatasetFromFolder, ValDatasetFromFolder, display_transform
 from model import Generator, Discriminator
 
-NUM_EPOCHS = 30
-PRETRAIN_EPOCHS = 5
+NUM_ADV_BASELINE_EPOCHS = 30
+NUM_BASELINE_PRETRAIN_EPOCHS = 5
 PATCH_SIZE = 128
 UPSCALE_FACTOR = 4
 NUM_RESIDUAL_BLOCKS = 16
 VALIDATION_FREQUENCY = 1
 NUM_LOGGED_VALIDATION_IMAGES = 30
 AUGMENT_PROB_TARGET = 0.6
-ADV_LOSS_BALANCER = 2e-4
+ADV_LOSS_BALANCER = 4e-5
 LABEL_SMOOTHING_FACTOR = 0.9
 VAL_DATASET_PERCENTAGE = 5
 
@@ -36,6 +36,9 @@ else:
 
 
 def main():
+    NUM_ADV_EPOCHS = NUM_ADV_BASELINE_EPOCHS
+    NUM_PRETRAIN_EPOCHS = NUM_BASELINE_PRETRAIN_EPOCHS
+
     training_start = datetime.datetime.now().isoformat()
     train_set = TrainDatasetFromFolder('data/celebA/train_set', patch_size=PATCH_SIZE, upscale_factor=UPSCALE_FACTOR)
     val_set = ValDatasetFromFolder('data/celebA/val_set', upscale_factor=UPSCALE_FACTOR)
@@ -66,7 +69,7 @@ def main():
                'd_fake_mean': [], 'psnr': [], 'ssim': []}
     augment_probability = 0
 
-    for epoch in range(1, PRETRAIN_EPOCHS + NUM_EPOCHS + 1):
+    for epoch in range(1, NUM_PRETRAIN_EPOCHS + NUM_ADV_EPOCHS + 1):
         train_bar = tqdm(train_loader, ncols=200)
         running_results = {'batch_sizes': 0, 'd_epoch_total_loss': 0, 'g_epoch_total_loss': 0, 'g_epoch_adv_loss': 0,
                            'g_epoch_content_loss': 0, 'd_epoch_real_mean': 0, 'd_epoch_fake_mean': 0}
@@ -82,7 +85,7 @@ def main():
             real_labels = torch.ones(batch_size, device=device)
             fake_labels = torch.zeros(batch_size, device=device)
 
-            if epoch > PRETRAIN_EPOCHS:
+            if epoch > NUM_PRETRAIN_EPOCHS:
                 # Discriminator training
                 d_optimizer.zero_grad(set_to_none=True)
 
@@ -104,7 +107,7 @@ def main():
             g_optimizer.zero_grad(set_to_none=True)
 
             fake_img = g_net(data)
-            if epoch > PRETRAIN_EPOCHS:
+            if epoch > NUM_PRETRAIN_EPOCHS:
                 adversarial_loss = bce_loss(d_net(fake_img), real_labels) * ADV_LOSS_BALANCER
                 content_loss = mse_loss(fake_img, target)
                 g_total_loss = content_loss + adversarial_loss
@@ -117,7 +120,7 @@ def main():
             g_total_loss.backward()
             g_optimizer.step()
 
-            if epoch > PRETRAIN_EPOCHS:
+            if epoch > NUM_PRETRAIN_EPOCHS:
                 rt = torch.mean(torch.sign(d_real_output - 0.5))
                 if rt > AUGMENT_PROB_TARGET:
                     augment_probability = min(1., augment_probability + 1e-3)
@@ -127,13 +130,13 @@ def main():
             running_results['g_epoch_total_loss'] += g_total_loss.to('cpu', non_blocking=True).detach() * batch_size
             running_results['g_epoch_adv_loss'] += adversarial_loss.to('cpu', non_blocking=True).detach() * batch_size
             running_results['g_epoch_content_loss'] += content_loss.to('cpu', non_blocking=True).detach() * batch_size
-            if epoch > PRETRAIN_EPOCHS:
+            if epoch > NUM_PRETRAIN_EPOCHS:
                 running_results['d_epoch_total_loss'] += d_total_loss.to('cpu', non_blocking=True).detach() * batch_size
                 running_results['d_epoch_real_mean'] += d_real_mean.to('cpu', non_blocking=True).detach() * batch_size
                 running_results['d_epoch_fake_mean'] += d_fake_mean.to('cpu', non_blocking=True).detach() * batch_size
 
             train_bar.set_description(
-                desc=f'[{epoch}/{NUM_EPOCHS + PRETRAIN_EPOCHS}] '
+                desc=f'[{epoch}/{NUM_ADV_EPOCHS + NUM_PRETRAIN_EPOCHS}] '
                      f'Loss_D: {running_results["d_epoch_total_loss"] / running_results["batch_sizes"]:.4f} '
                      f'Loss_G: {running_results["g_epoch_total_loss"] / running_results["batch_sizes"]:.4f} '
                      f'Loss_G_adv: {running_results["g_epoch_adv_loss"] / running_results["batch_sizes"]:.4f} '
