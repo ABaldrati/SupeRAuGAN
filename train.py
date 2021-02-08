@@ -72,13 +72,14 @@ def main():
     bce_loss.to(device=device)
     mse_loss.to(device=device)
     results = {'d_total_loss': [], 'g_total_loss': [], 'g_adv_loss': [], 'g_content_loss': [], 'd_real_mean': [],
-               'd_fake_mean': [], 'psnr': [], 'ssim': []}
+               'd_fake_mean': [], 'psnr': [], 'ssim': [], 'rt': [], 'augment_probability': []}
     augment_probability = 0
 
     for epoch in range(1, NUM_PRETRAIN_EPOCHS + NUM_ADV_EPOCHS + 1):
         train_bar = tqdm(train_loader, ncols=200)
         running_results = {'batch_sizes': 0, 'd_epoch_total_loss': 0, 'g_epoch_total_loss': 0, 'g_epoch_adv_loss': 0,
-                           'g_epoch_content_loss': 0, 'd_epoch_real_mean': 0, 'd_epoch_fake_mean': 0}
+                           'g_epoch_content_loss': 0, 'd_epoch_real_mean': 0, 'd_epoch_fake_mean': 0, 'rt': 0,
+                           'augment_probability': 0}
 
         g_net.train()
         d_net.train()
@@ -141,6 +142,8 @@ def main():
                 running_results['d_epoch_total_loss'] += d_total_loss.to('cpu', non_blocking=True).detach() * batch_size
                 running_results['d_epoch_real_mean'] += d_real_mean.to('cpu', non_blocking=True).detach() * batch_size
                 running_results['d_epoch_fake_mean'] += d_fake_mean.to('cpu', non_blocking=True).detach() * batch_size
+                running_results['rt'] += rt.to('cpu', non_blocking=True).detach() * batch_size
+                running_results['augment_probability'] += augment_probability * batch_size
 
             train_bar.set_description(
                 desc=f'[{epoch}/{NUM_ADV_EPOCHS + NUM_PRETRAIN_EPOCHS}] '
@@ -149,7 +152,9 @@ def main():
                      f'Loss_G_adv: {running_results["g_epoch_adv_loss"] / running_results["batch_sizes"]:.4f} '
                      f'Loss_G_content: {running_results["g_epoch_content_loss"] / running_results["batch_sizes"]:.4f} '
                      f'D(x): {running_results["d_epoch_real_mean"] / running_results["batch_sizes"]:.4f} '
-                     f'D(G(z)): {running_results["d_epoch_fake_mean"] / running_results["batch_sizes"]:.4f}')
+                     f'D(G(z)): {running_results["d_epoch_fake_mean"] / running_results["batch_sizes"]:.4f} '
+                     f'rt: {running_results["rt"] / running_results["batch_sizes"]:.4f} '
+                     f'augment_probability: {running_results["augment_probability"] / running_results["batch_sizes"]:.4f}')
 
         if epoch % VALIDATION_FREQUENCY == 1 or VALIDATION_FREQUENCY == 1:
             g_net.eval()
@@ -207,6 +212,8 @@ def main():
         results['g_content_loss'].append(running_results['g_epoch_content_loss'] / running_results['batch_sizes'])
         results['d_real_mean'].append(running_results['d_epoch_real_mean'] / running_results['batch_sizes'])
         results['d_fake_mean'].append(running_results['d_epoch_fake_mean'] / running_results['batch_sizes'])
+        results['rt'].append(running_results['rt'] / running_results['batch_sizes'])
+        results['augment_probability'].append(running_results['augment_probability'] / running_results['batch_sizes'])
         results['psnr'].append(val_results['epoch_avg_psnr'])
         results['ssim'].append(val_results['epoch_avg_ssim'])
 
@@ -215,10 +222,7 @@ def main():
 
         if epoch % VALIDATION_FREQUENCY == 1 or VALIDATION_FREQUENCY == 1:
             data_frame = pd.DataFrame(
-                data={'d_total_loss': results['d_total_loss'], 'g_total_loss': results['g_total_loss'],
-                      'g_adv_loss': results['g_adv_loss'], 'g_content_loss': results['g_content_loss'],
-                      'd_real_mean': results['d_real_mean'], 'd_fake_mean': results['d_fake_mean'],
-                      'PSNR': results['psnr'], 'SSIM': results['ssim']},
+                data=results,
                 index=range(1, epoch + 1))
             data_frame.to_csv(str(results_folder / f"train_results.csv"), index_label='Epoch')
 
