@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader, Subset
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from data_utils import TrainDatasetFromFolder, ValDatasetFromFolder, display_transform
+from data_utils import TrainDatasetFromFolder, ValDatasetFromFolder, display_transform, augment_batch
 from model import Generator, Discriminator
 
 NUM_ADV_BASELINE_EPOCHS = 30
@@ -26,6 +26,7 @@ NUM_LOGGED_VALIDATION_IMAGES = 30
 AUGMENT_PROB_TARGET = 0.6
 ADV_LOSS_BALANCER = 4e-5
 LABEL_SMOOTHING_FACTOR = 0.9
+TRAIN_DATASET_PERCENTAGE = 1
 VAL_DATASET_PERCENTAGE = 5
 
 if torch.cuda.is_available():
@@ -36,19 +37,24 @@ else:
 
 
 def main():
-    NUM_ADV_EPOCHS = NUM_ADV_BASELINE_EPOCHS
-    NUM_PRETRAIN_EPOCHS = NUM_BASELINE_PRETRAIN_EPOCHS
+    NUM_ADV_EPOCHS = round(NUM_ADV_BASELINE_EPOCHS / (TRAIN_DATASET_PERCENTAGE / 100))
+    NUM_PRETRAIN_EPOCHS = round(NUM_BASELINE_PRETRAIN_EPOCHS / (TRAIN_DATASET_PERCENTAGE / 100))
 
     training_start = datetime.datetime.now().isoformat()
-    train_set = TrainDatasetFromFolder('data/celebA/train_set', patch_size=PATCH_SIZE, upscale_factor=UPSCALE_FACTOR)
-    val_set = ValDatasetFromFolder('data/celebA/val_set', upscale_factor=UPSCALE_FACTOR)
+    train_set = TrainDatasetFromFolder('data/ffhq/images512x512/train_set', patch_size=PATCH_SIZE,
+                                       upscale_factor=UPSCALE_FACTOR)
+    len_train_set = len(train_set)
+    train_set = Subset(train_set, list(
+        np.random.choice(np.arange(len_train_set), int(len_train_set * TRAIN_DATASET_PERCENTAGE / 100), False)))
+    val_set = ValDatasetFromFolder('data/ffhq/images512x512/val_set', upscale_factor=UPSCALE_FACTOR)
     len_val_set = len(val_set)
     val_set = Subset(val_set, list(
         np.random.choice(np.arange(len_val_set), int(len_val_set * VAL_DATASET_PERCENTAGE / 100), False)))
     train_loader = DataLoader(dataset=train_set, num_workers=4, batch_size=32, shuffle=True, pin_memory=True)
     val_loader = DataLoader(dataset=val_set, num_workers=4, batch_size=1, shuffle=False, pin_memory=True)
 
-    results_folder = Path(f"results_{training_start}_CS:{PATCH_SIZE}_US:{UPSCALE_FACTOR}x")
+    results_folder = Path(
+        f"results_{training_start}_CS:{PATCH_SIZE}_US:{UPSCALE_FACTOR}x_TRAIN:{TRAIN_DATASET_PERCENTAGE}%")
     results_folder.mkdir(exist_ok=True)
     writer = SummaryWriter(str(results_folder / "tensorboard_log"))
     g_net = Generator(n_residual_blocks=NUM_RESIDUAL_BLOCKS, upsample_factor=UPSCALE_FACTOR)
@@ -89,11 +95,11 @@ def main():
                 # Discriminator training
                 d_optimizer.zero_grad(set_to_none=True)
 
-                d_real_output = d_net(target)
+                d_real_output = d_net(augment_batch(target, augment_probability))
                 d_real_output_loss = bce_loss(d_real_output, real_labels * LABEL_SMOOTHING_FACTOR)
 
                 fake_img = g_net(data)
-                d_fake_output = d_net(fake_img)
+                d_fake_output = d_net(augment_batch(fake_img, augment_probability))
                 d_fake_output_loss = bce_loss(d_fake_output, fake_labels)
 
                 d_total_loss = d_real_output_loss + d_fake_output_loss
@@ -108,7 +114,8 @@ def main():
 
             fake_img = g_net(data)
             if epoch > NUM_PRETRAIN_EPOCHS:
-                adversarial_loss = bce_loss(d_net(fake_img), real_labels) * ADV_LOSS_BALANCER
+                adversarial_loss = bce_loss(d_net(augment_batch(fake_img, augment_probability)),
+                                            real_labels) * ADV_LOSS_BALANCER
                 content_loss = mse_loss(fake_img, target)
                 g_total_loss = content_loss + adversarial_loss
             else:
@@ -175,20 +182,23 @@ def main():
 
                     val_bar.set_description(
                         desc=f"[converting LR images to SR images] PSNR: {val_results['epoch_avg_psnr']:4f} dB SSIM: {val_results['epoch_avg_ssim']:4f}")
-                    if len(val_images) < NUM_LOGGED_VALIDATION_IMAGES * 3:
+                    if len(val_images) < NUM_LOGGED_VALIDATION_IMAGES * 3 and epoch % round(
+                            VALIDATION_FREQUENCY / (TRAIN_DATASET_PERCENTAGE / 100)) == 1:
                         # This requires validation batch size = 1
                         val_images.extend(
                             [display_transform()(val_hr_restore.squeeze(0)),
                              display_transform()(hr.data.cpu().squeeze(0)),
                              display_transform()(sr.data.cpu().squeeze(0))])
 
-                val_images = torch.stack(val_images)
-                val_images = torch.chunk(val_images, val_images.size(0) // 15)
-                val_save_bar = tqdm(val_images, desc='[saving validation results]', ncols=160)
+                if epoch % round(VALIDATION_FREQUENCY / (TRAIN_DATASET_PERCENTAGE / 100)) == 1:
 
-                for index, image_batch in enumerate(val_save_bar, start=1):
-                    image_grid = utils.make_grid(image_batch, nrow=3, padding=5)
-                    writer.add_image(f'epoch_{epoch}_index_{index}.png', image_grid)
+                    val_images = torch.stack(val_images)
+                    val_images = torch.chunk(val_images, val_images.size(0) // 15)
+                    val_save_bar = tqdm(val_images, desc='[saving validation results]', ncols=160)
+
+                    for index, image_batch in enumerate(val_save_bar, start=1):
+                        image_grid = utils.make_grid(image_batch, nrow=3, padding=5)
+                        writer.add_image(f'epoch_{epoch}_index_{index}.png', image_grid)
 
         # save loss / scores / psnr /ssim
         results['d_total_loss'].append(running_results['d_epoch_total_loss'] / running_results['batch_sizes'])
@@ -212,16 +222,17 @@ def main():
                 index=range(1, epoch + 1))
             data_frame.to_csv(str(results_folder / f"train_results.csv"), index_label='Epoch')
 
-            # save model parameters
-            models_path = results_folder / "saved_models"
-            models_path.mkdir(exist_ok=True)
-            torch.save({
-                'epoch': epoch,
-                'g_net': g_net.state_dict(),
-                'd_net': g_net.state_dict(),
-                'g_optimizer': g_optimizer.state_dict(),
-                'd_optimizer': d_optimizer.state_dict(),
-            }, str(models_path / f'epoch_{epoch}.tar'))
+            if epoch % round(VALIDATION_FREQUENCY / (TRAIN_DATASET_PERCENTAGE / 100)) == 1:
+                # save model parameters
+                models_path = results_folder / "saved_models"
+                models_path.mkdir(exist_ok=True)
+                torch.save({
+                    'epoch': epoch,
+                    'g_net': g_net.state_dict(),
+                    'd_net': g_net.state_dict(),
+                    'g_optimizer': g_optimizer.state_dict(),
+                    'd_optimizer': d_optimizer.state_dict(),
+                }, str(models_path / f'epoch_{epoch}.tar'))
 
 
 if __name__ == '__main__':
