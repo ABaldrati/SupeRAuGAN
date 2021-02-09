@@ -36,6 +36,7 @@ else:
 
 
 def main():
+    global augment_batch
     parser = ArgumentParser()
     parser.add_argument("--augmentation", action='store_true', default=False)
     parser.add_argument("--train-dataset-percentage", type=int, default=100)
