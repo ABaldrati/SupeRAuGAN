@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader, Subset
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from data_utils import TrainDatasetFromFolder, ValDatasetFromFolder, display_transform, augment_batch
+from data_utils import TrainDatasetFromFolder, ValDatasetFromFolder, display_transform, HrValDatasetFromFolder
 from model import Generator, Discriminator
 
 NUM_ADV_BASELINE_EPOCHS = 30
@@ -52,6 +52,7 @@ def main():
         np.random.choice(np.arange(len_val_set), int(len_val_set * VAL_DATASET_PERCENTAGE / 100), False)))
     train_loader = DataLoader(dataset=train_set, num_workers=4, batch_size=32, shuffle=True, pin_memory=True)
     val_loader = DataLoader(dataset=val_set, num_workers=4, batch_size=1, shuffle=False, pin_memory=True)
+    epoch_validation_hr_dataset = HrValDatasetFromFolder('data/ffhq/images512x512/val_set')
 
     results_folder = Path(
         f"results_{training_start}_CS:{PATCH_SIZE}_US:{UPSCALE_FACTOR}x_TRAIN:{TRAIN_DATASET_PERCENTAGE}%")

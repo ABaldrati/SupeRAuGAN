@@ -87,6 +87,19 @@ class ValDatasetFromFolder(Dataset):
         return len(self.image_filenames)
 
 
+class HrValDatasetFromFolder(Dataset):
+    def __init__(self, dataset_dir):
+        super(HrValDatasetFromFolder, self).__init__()
+        self.image_filenames = [join(dataset_dir, x) for x in listdir(dataset_dir) if is_image_file(x)]
+
+    def __getitem__(self, index):
+        hr_image = Image.open(self.image_filenames[index])
+        return (ToTensor()(hr_image) * 255).to(torch.uint8)
+
+    def __len__(self):
+        return len(self.image_filenames)
+
+
 class TestDatasetFromFolder(Dataset):
     def __init__(self, dataset_dir, upscale_factor):
         super(TestDatasetFromFolder, self).__init__()
