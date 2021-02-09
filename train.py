@@ -4,7 +4,6 @@ from math import log10
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import pytorch_ssim
 import torch
 import torchvision.utils as utils
@@ -259,22 +258,16 @@ def main():
             writer.add_scalar(metric, metric_values[-1], int(image_percentage * num_images * 0.01))
 
         if epoch % VALIDATION_FREQUENCY == 1 or VALIDATION_FREQUENCY == 1:
-            data_frame = pd.DataFrame(
-                data=results,
-                index=range(1, epoch + 1))
-            data_frame.to_csv(str(results_folder / f"train_results.csv"), index_label='Epoch')
-
-            if epoch % round(VALIDATION_FREQUENCY / (TRAIN_DATASET_PERCENTAGE / 100)) == 1:
-                # save model parameters
-                models_path = results_folder / "saved_models"
-                models_path.mkdir(exist_ok=True)
-                torch.save({
-                    'epoch': epoch,
-                    'g_net': g_net.state_dict(),
-                    'd_net': g_net.state_dict(),
-                    'g_optimizer': g_optimizer.state_dict(),
-                    'd_optimizer': d_optimizer.state_dict(),
-                }, str(models_path / f'epoch_{epoch}.tar'))
+            # save model parameters
+            models_path = results_folder / "saved_models"
+            models_path.mkdir(exist_ok=True)
+            torch.save({
+                'progress': image_percentage,
+                'g_net': g_net.state_dict(),
+                'd_net': g_net.state_dict(),
+                'g_optimizer': g_optimizer.state_dict(),
+                'd_optimizer': d_optimizer.state_dict(),
+            }, str(models_path / f'progress_{image_percentage:.1f}.tar'))
 
 
 if __name__ == '__main__':
