@@ -122,6 +122,18 @@ class TestDatasetFromFolder(Dataset):
         return len(self.lr_filenames)
 
 
+class SingleTensorDataset(Dataset):
+    def __init__(self, data: torch.tensor):
+        super(SingleTensorDataset, self).__init__()
+        self.data = data
+
+    def __getitem__(self, index) -> T_co:
+        return self.data[index]
+
+    def __len__(self):
+        return len(self.data)
+
+
 def rgb_to_ycbcr(image: torch.Tensor) -> torch.Tensor:
     r"""Convert an RGB image to YCbCr.
 

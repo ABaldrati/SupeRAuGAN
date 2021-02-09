@@ -9,11 +9,12 @@ import torch
 import torchvision.utils as utils
 from torch import optim
 from torch.nn import BCELoss, MSELoss
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader, Subset, ConcatDataset
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from data_utils import TrainDatasetFromFolder, ValDatasetFromFolder, display_transform, HrValDatasetFromFolder
+from data_utils import TrainDatasetFromFolder, ValDatasetFromFolder, display_transform, SingleTensorDataset, \
+    HrValDatasetFromFolder
 from model import Generator, Discriminator
 
 NUM_ADV_BASELINE_EPOCHS = 30
@@ -169,6 +170,7 @@ def main():
                                'epoch_avg_ssim': 0,
                                'batch_sizes': 0, }
                 val_images = []
+                epoch_validation_sr_dataset = None
                 for lr, val_hr_restore, hr in val_bar:
                     batch_size = lr.size(0)
                     val_results['batch_sizes'] += batch_size
@@ -177,13 +179,20 @@ def main():
 
                     sr = g_net(lr)
                     sr = torch.clamp(sr, 0., 1.)
+                    if not epoch_validation_sr_dataset:
+                        epoch_validation_sr_dataset = SingleTensorDataset((sr.cpu() * 255).to(torch.uint8))
+
+                    else:
+                        epoch_validation_sr_dataset = ConcatDataset(
+                            (epoch_validation_sr_dataset, SingleTensorDataset((sr.cpu() * 255).to(torch.uint8))))
+
                     batch_mse = ((sr - hr) ** 2).data.mean()  # Pixel-wise MSE
                     val_results['epoch_mse'] += batch_mse * batch_size
                     batch_ssim = pytorch_ssim.ssim(sr, hr).item()
                     val_results['epoch_ssim'] += batch_ssim * batch_size
                     val_results['epoch_avg_ssim'] = val_results['epoch_ssim'] / val_results['batch_sizes']
                     val_results['epoch_psnr'] += 20 * log10(
-                        hr.max() / (batch_mse / batch_size)) * batch_size  # TODO: Is it hr.max() or sr.max()?
+                        hr.max() / (batch_mse / batch_size)) * batch_size
                     val_results['epoch_avg_psnr'] = val_results['epoch_psnr'] / val_results['batch_sizes']
 
                     val_bar.set_description(
