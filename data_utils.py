@@ -3,14 +3,13 @@ from os import listdir
 from os.path import join
 from random import choice, uniform
 
-import matplotlib.pyplot as plt
 import torch
 from PIL import Image
 from numpy.random.mtrand import lognormal, normal
-from torch.utils.data.dataset import Dataset
-from torchvision.transforms import Compose, RandomCrop, ToTensor, ToPILImage, CenterCrop, Resize, Normalize
-from torchvision.transforms.functional import hflip, affine, resize, adjust_brightness, adjust_contrast, to_tensor, \
-    adjust_hue, adjust_saturation, to_pil_image, pad, center_crop
+from torch.utils.data.dataset import Dataset, T_co
+from torchvision.transforms import Compose, RandomCrop, ToTensor, ToPILImage, CenterCrop, Resize
+from torchvision.transforms.functional import hflip, affine, resize, adjust_brightness, adjust_contrast, adjust_hue, \
+    adjust_saturation, pad, center_crop
 
 
 def is_image_file(filename):
