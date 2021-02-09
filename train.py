@@ -37,7 +37,7 @@ else:
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument("--augmentation", type=bool, default=False)
+    parser.add_argument("--augmentation", action='store_true', default=False)
     parser.add_argument("--train-dataset-percentage", type=int, default=100)
     parser.add_argument("--val-dataset-percentage", type=int, default=5)
     parser.add_argument("--label-smoothing", type=float, default=0.9)
