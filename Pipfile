@@ -6,5 +6,6 @@ Pillow = "*"
 pytorch_ssim = { git = "http://github.com/Po-Hsun-Su/pytorch-ssim.git" }
 pandas = "1.2"
 tensorboard = "2.4"
-
+lpips = "0.1"
+torch-fidelity = "0.2"
 [dev-packages]

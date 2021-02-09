@@ -7,10 +7,12 @@ import pandas as pd
 import pytorch_ssim
 import torch
 import torchvision.utils as utils
+from lpips import lpips
 from torch import optim
 from torch.nn import BCELoss, MSELoss
 from torch.utils.data import DataLoader, Subset, ConcatDataset
 from torch.utils.tensorboard import SummaryWriter
+from torch_fidelity import calculate_metrics
 from tqdm import tqdm
 
 from data_utils import TrainDatasetFromFolder, ValDatasetFromFolder, display_transform, SingleTensorDataset, \
@@ -61,9 +63,11 @@ def main():
     writer = SummaryWriter(str(results_folder / "tensorboard_log"))
     g_net = Generator(n_residual_blocks=NUM_RESIDUAL_BLOCKS, upsample_factor=UPSCALE_FACTOR)
     d_net = Discriminator(patch_size=PATCH_SIZE)
+    lpips_metric = lpips.LPIPS(net='alex')
 
     g_net.to(device=device)
     d_net.to(device=device)
+    lpips_metric.to(device=device)
 
     g_optimizer = optim.Adam(g_net.parameters(), lr=1e-4)
     d_optimizer = optim.Adam(d_net.parameters(), lr=1e-4)
@@ -74,9 +78,9 @@ def main():
     bce_loss.to(device=device)
     mse_loss.to(device=device)
     results = {'d_total_loss': [], 'g_total_loss': [], 'g_adv_loss': [], 'g_content_loss': [], 'd_real_mean': [],
-               'd_fake_mean': [], 'psnr': [], 'ssim': [], 'rt': [], 'augment_probability': []}
-    augment_probability = 0
+               'd_fake_mean': [], 'psnr': [], 'ssim': [], 'lpips': [], 'fid': [], 'rt': [], 'augment_probability': []}
 
+    augment_probability = 0
     for epoch in range(1, NUM_PRETRAIN_EPOCHS + NUM_ADV_EPOCHS + 1):
         train_bar = tqdm(train_loader, ncols=200)
         running_results = {'batch_sizes': 0, 'd_epoch_total_loss': 0, 'g_epoch_total_loss': 0, 'g_epoch_adv_loss': 0,
@@ -167,9 +171,9 @@ def main():
             with torch.no_grad():
                 val_bar = tqdm(val_loader, ncols=160)
                 val_results = {'epoch_mse': 0, 'epoch_ssim': 0, 'epoch_psnr': 0, 'epoch_avg_psnr': 0,
-                               'epoch_avg_ssim': 0,
-                               'batch_sizes': 0, }
                 val_images = []
+                               'epoch_avg_ssim': 0, 'epoch_lpips': 0, 'epoch_avg_lpips': 0, 'epoch_fid': 0,
+                               'batch_sizes': 0}
                 epoch_validation_sr_dataset = None
                 for lr, val_hr_restore, hr in val_bar:
                     batch_size = lr.size(0)
@@ -194,6 +198,9 @@ def main():
                     val_results['epoch_psnr'] += 20 * log10(
                         hr.max() / (batch_mse / batch_size)) * batch_size
                     val_results['epoch_avg_psnr'] = val_results['epoch_psnr'] / val_results['batch_sizes']
+                    val_results['epoch_lpips'] += torch.mean(lpips_metric(hr * 2 - 1, sr * 2 - 1)).to(
+                        'cpu', non_blocking=True).detach() * batch_size
+                    val_results['epoch_avg_lpips'] = val_results['epoch_lpips'] / val_results['batch_sizes']
 
                     val_bar.set_description(
                         desc=f"[converting LR images to SR images] PSNR: {val_results['epoch_avg_psnr']:4f} dB SSIM: {val_results['epoch_avg_ssim']:4f}")
@@ -214,6 +221,9 @@ def main():
                     for index, image_batch in enumerate(val_save_bar, start=1):
                         image_grid = utils.make_grid(image_batch, nrow=3, padding=5)
                         writer.add_image(f'epoch_{epoch}_index_{index}.png', image_grid)
+                val_results['epoch_fid'] = calculate_metrics(
+                    epoch_validation_sr_dataset, epoch_validation_hr_dataset,
+                    cuda=True, fid=True, verbose=False)['frechet_inception_distance']
 
         # save loss / scores / psnr /ssim
         results['d_total_loss'].append(running_results['d_epoch_total_loss'] / running_results['batch_sizes'])
@@ -224,8 +234,11 @@ def main():
         results['d_fake_mean'].append(running_results['d_epoch_fake_mean'] / running_results['batch_sizes'])
         results['rt'].append(running_results['rt'] / running_results['batch_sizes'])
         results['augment_probability'].append(running_results['augment_probability'] / running_results['batch_sizes'])
-        results['psnr'].append(val_results['epoch_avg_psnr'])
-        results['ssim'].append(val_results['epoch_avg_ssim'])
+        if epoch % VALIDATION_FREQUENCY == 1 or VALIDATION_FREQUENCY == 1:
+            results['psnr'].append(val_results['epoch_avg_psnr'])
+            results['ssim'].append(val_results['epoch_avg_ssim'])
+            results['lpips'].append(val_results['epoch_avg_lpips'])
+            results['fid'].append(val_results['epoch_fid'])
 
         for metric, metric_values in results.items():
             writer.add_scalar(metric, metric_values[-1], epoch)
