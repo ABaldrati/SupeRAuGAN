@@ -1,4 +1,5 @@
 import datetime
+from argparse import ArgumentParser
 from math import log10
 from pathlib import Path
 
@@ -24,13 +25,9 @@ NUM_BASELINE_PRETRAIN_EPOCHS = 5
 PATCH_SIZE = 128
 UPSCALE_FACTOR = 4
 NUM_RESIDUAL_BLOCKS = 16
-VALIDATION_FREQUENCY = 1
-NUM_LOGGED_VALIDATION_IMAGES = 30
+NUM_LOGGED_VALIDATION_IMAGES = 16
 AUGMENT_PROB_TARGET = 0.6
 ADV_LOSS_BALANCER = 4e-5
-LABEL_SMOOTHING_FACTOR = 0.9
-TRAIN_DATASET_PERCENTAGE = 1
-VAL_DATASET_PERCENTAGE = 5
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -40,8 +37,25 @@ else:
 
 
 def main():
+    parser = ArgumentParser()
+    parser.add_argument("--augmentation", type=bool, default=False)
+    parser.add_argument("--train-dataset-percentage", type=int, default=100)
+    parser.add_argument("--val-dataset-percentage", type=int, default=5)
+    parser.add_argument("--label-smoothing", type=float, default=0.9)
+    parser.add_argument("--validation-frequency", type=int, default=1)
+    args = parser.parse_args()
+
+    ENABLE_AUGMENTATION = args.augmentation
+    TRAIN_DATASET_PERCENTAGE = args.train_dataset_percentage
+    VAL_DATASET_PERCENTAGE = args.val_dataset_percentage
+    LABEL_SMOOTHING_FACTOR = args.label_smoothing
+    VALIDATION_FREQUENCY = args.validation_frequency
+
+    if not ENABLE_AUGMENTATION:
+        augment_batch = lambda x, _: x
     NUM_ADV_EPOCHS = round(NUM_ADV_BASELINE_EPOCHS / (TRAIN_DATASET_PERCENTAGE / 100))
     NUM_PRETRAIN_EPOCHS = round(NUM_BASELINE_PRETRAIN_EPOCHS / (TRAIN_DATASET_PERCENTAGE / 100))
+    VALIDATION_FREQUENCY = round(VALIDATION_FREQUENCY / (TRAIN_DATASET_PERCENTAGE / 100))
 
     training_start = datetime.datetime.now().isoformat()
     train_set = TrainDatasetFromFolder('data/ffhq/images512x512/train_set', patch_size=PATCH_SIZE,
@@ -49,12 +63,16 @@ def main():
     len_train_set = len(train_set)
     train_set = Subset(train_set, list(
         np.random.choice(np.arange(len_train_set), int(len_train_set * TRAIN_DATASET_PERCENTAGE / 100), False)))
+
     val_set = ValDatasetFromFolder('data/ffhq/images512x512/val_set', upscale_factor=UPSCALE_FACTOR)
     len_val_set = len(val_set)
     val_set = Subset(val_set, list(
         np.random.choice(np.arange(len_val_set), int(len_val_set * VAL_DATASET_PERCENTAGE / 100), False)))
+
     train_loader = DataLoader(dataset=train_set, num_workers=4, batch_size=32, shuffle=True, pin_memory=True)
-    val_loader = DataLoader(dataset=val_set, num_workers=4, batch_size=1, shuffle=False, pin_memory=True)
+    val_loader = DataLoader(dataset=val_set, num_workers=4, batch_size=NUM_LOGGED_VALIDATION_IMAGES, shuffle=False,
+                            pin_memory=True)
+
     epoch_validation_hr_dataset = HrValDatasetFromFolder('data/ffhq/images512x512/val_set')
 
     results_folder = Path(
@@ -81,12 +99,13 @@ def main():
                'd_fake_mean': [], 'psnr': [], 'ssim': [], 'lpips': [], 'fid': [], 'rt': [], 'augment_probability': []}
 
     augment_probability = 0
+    num_images = len(train_set) * (NUM_PRETRAIN_EPOCHS + NUM_ADV_EPOCHS)
     for epoch in range(1, NUM_PRETRAIN_EPOCHS + NUM_ADV_EPOCHS + 1):
         train_bar = tqdm(train_loader, ncols=200)
         running_results = {'batch_sizes': 0, 'd_epoch_total_loss': 0, 'g_epoch_total_loss': 0, 'g_epoch_adv_loss': 0,
                            'g_epoch_content_loss': 0, 'd_epoch_real_mean': 0, 'd_epoch_fake_mean': 0, 'rt': 0,
                            'augment_probability': 0}
-
+        image_percentage = epoch / (NUM_PRETRAIN_EPOCHS + NUM_ADV_EPOCHS) * 100
         g_net.train()
         d_net.train()
 
@@ -171,9 +190,9 @@ def main():
             with torch.no_grad():
                 val_bar = tqdm(val_loader, ncols=160)
                 val_results = {'epoch_mse': 0, 'epoch_ssim': 0, 'epoch_psnr': 0, 'epoch_avg_psnr': 0,
-                val_images = []
                                'epoch_avg_ssim': 0, 'epoch_lpips': 0, 'epoch_avg_lpips': 0, 'epoch_fid': 0,
                                'batch_sizes': 0}
+                val_images = torch.empty((0, 0))
                 epoch_validation_sr_dataset = None
                 for lr, val_hr_restore, hr in val_bar:
                     batch_size = lr.size(0)
@@ -203,27 +222,23 @@ def main():
                     val_results['epoch_avg_lpips'] = val_results['epoch_lpips'] / val_results['batch_sizes']
 
                     val_bar.set_description(
-                        desc=f"[converting LR images to SR images] PSNR: {val_results['epoch_avg_psnr']:4f} dB SSIM: {val_results['epoch_avg_ssim']:4f}")
-                    if len(val_images) < NUM_LOGGED_VALIDATION_IMAGES * 3 and epoch % round(
-                            VALIDATION_FREQUENCY / (TRAIN_DATASET_PERCENTAGE / 100)) == 1:
-                        # This requires validation batch size = 1
-                        val_images.extend(
-                            [display_transform()(val_hr_restore.squeeze(0)),
-                             display_transform()(hr.data.cpu().squeeze(0)),
-                             display_transform()(sr.data.cpu().squeeze(0))])
-
-                if epoch % round(VALIDATION_FREQUENCY / (TRAIN_DATASET_PERCENTAGE / 100)) == 1:
-
-                    val_images = torch.stack(val_images)
-                    val_images = torch.chunk(val_images, val_images.size(0) // 15)
-                    val_save_bar = tqdm(val_images, desc='[saving validation results]', ncols=160)
-
-                    for index, image_batch in enumerate(val_save_bar, start=1):
-                        image_grid = utils.make_grid(image_batch, nrow=3, padding=5)
-                        writer.add_image(f'epoch_{epoch}_index_{index}.png', image_grid)
+                        desc=f"[converting LR images to SR images] PSNR: {val_results['epoch_avg_psnr']:4f} dB "
+                             f"SSIM: {val_results['epoch_avg_ssim']:4f} "
+                             f"LPIPS: {val_results['epoch_avg_lpips']:.4f} ")
+                    if val_images.size(0) * val_images.size(1) < NUM_LOGGED_VALIDATION_IMAGES * 3:
+                        val_images = torch.hstack((display_transform()(val_hr_restore).unsqueeze(0).transpose(0, 1),
+                                                   display_transform()(hr.data.cpu()).unsqueeze(0).transpose(0, 1),
+                                                   display_transform()(sr.data.cpu()).unsqueeze(0).transpose(0, 1)))
                 val_results['epoch_fid'] = calculate_metrics(
                     epoch_validation_sr_dataset, epoch_validation_hr_dataset,
                     cuda=True, fid=True, verbose=False)['frechet_inception_distance']
+
+                val_images = val_images.view((4, -1, 3, 400, 400))
+                val_save_bar = tqdm(val_images, desc='[saving validation results]', ncols=160)
+
+                for index, image_batch in enumerate(val_save_bar, start=1):
+                    image_grid = utils.make_grid(image_batch, nrow=3, padding=5)
+                    writer.add_image(f'progress{image_percentage:.1f}_index_{index}.png', image_grid)
 
         # save loss / scores / psnr /ssim
         results['d_total_loss'].append(running_results['d_epoch_total_loss'] / running_results['batch_sizes'])
@@ -241,7 +256,7 @@ def main():
             results['fid'].append(val_results['epoch_fid'])
 
         for metric, metric_values in results.items():
-            writer.add_scalar(metric, metric_values[-1], epoch)
+            writer.add_scalar(metric, metric_values[-1], int(image_percentage * num_images * 0.01))
 
         if epoch % VALIDATION_FREQUENCY == 1 or VALIDATION_FREQUENCY == 1:
             data_frame = pd.DataFrame(
