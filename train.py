@@ -16,7 +16,7 @@ from torch_fidelity import calculate_metrics
 from tqdm import tqdm
 
 from data_utils import TrainDatasetFromFolder, ValDatasetFromFolder, display_transform, SingleTensorDataset, \
-    HrValDatasetFromFolder
+    HrValDatasetFromFolder, augment_batch
 from model import Generator, Discriminator
 
 NUM_ADV_BASELINE_EPOCHS = 30
