@@ -8,4 +8,5 @@ pandas = "1.2"
 tensorboard = "2.4"
 lpips = "0.1"
 torch-fidelity = "0.2"
+ninja = "1.10"
 [dev-packages]

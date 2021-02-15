@@ -15,8 +15,9 @@ from torch.utils.tensorboard import SummaryWriter
 from torch_fidelity import calculate_metrics
 from tqdm import tqdm
 
+from augment import AugmentPipe
 from data_utils import TrainDatasetFromFolder, ValDatasetFromFolder, display_transform, SingleTensorDataset, \
-    HrValDatasetFromFolder, augment_batch
+    HrValDatasetFromFolder
 from model import Generator, Discriminator
 
 NUM_ADV_BASELINE_EPOCHS = 30
@@ -36,7 +37,6 @@ else:
 
 
 def main():
-    global augment_batch
     parser = ArgumentParser()
     parser.add_argument("--augmentation", action='store_true', default=False)
     parser.add_argument("--train-dataset-percentage", type=int, default=100)
@@ -51,8 +51,13 @@ def main():
     LABEL_SMOOTHING_FACTOR = args.label_smoothing
     VALIDATION_FREQUENCY = args.validation_frequency
 
-    if not ENABLE_AUGMENTATION:
-        augment_batch = lambda x, _: x
+    if ENABLE_AUGMENTATION:
+        augment_batch = AugmentPipe()
+        augment_batch.to(device)
+    else:
+        augment_batch = lambda x: x
+        augment_batch.p = 0
+
     NUM_ADV_EPOCHS = round(NUM_ADV_BASELINE_EPOCHS / (TRAIN_DATASET_PERCENTAGE / 100))
     NUM_PRETRAIN_EPOCHS = round(NUM_BASELINE_PRETRAIN_EPOCHS / (TRAIN_DATASET_PERCENTAGE / 100))
     VALIDATION_FREQUENCY = round(VALIDATION_FREQUENCY / (TRAIN_DATASET_PERCENTAGE / 100))
@@ -110,6 +115,7 @@ def main():
         d_net.train()
 
         for data, target in train_bar:
+            augment_batch.p = torch.tensor([augment_probability], device=device)
             batch_size = data.size(0)
             running_results["batch_sizes"] += batch_size
             target = target.to(device)
@@ -121,11 +127,11 @@ def main():
                 # Discriminator training
                 d_optimizer.zero_grad(set_to_none=True)
 
-                d_real_output = d_net(augment_batch(target, augment_probability))
+                d_real_output = d_net(augment_batch(target))
                 d_real_output_loss = bce_loss(d_real_output, real_labels * LABEL_SMOOTHING_FACTOR)
 
                 fake_img = g_net(data)
-                d_fake_output = d_net(augment_batch(fake_img, augment_probability))
+                d_fake_output = d_net(augment_batch(fake_img))
                 d_fake_output_loss = bce_loss(d_fake_output, fake_labels)
 
                 d_total_loss = d_real_output_loss + d_fake_output_loss
@@ -140,7 +146,7 @@ def main():
 
             fake_img = g_net(data)
             if epoch > NUM_PRETRAIN_EPOCHS:
-                adversarial_loss = bce_loss(d_net(augment_batch(fake_img, augment_probability)),
+                adversarial_loss = bce_loss(d_net(augment_batch(fake_img)),
                                             real_labels) * ADV_LOSS_BALANCER
                 content_loss = mse_loss(fake_img, target)
                 g_total_loss = content_loss + adversarial_loss

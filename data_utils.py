@@ -1,4 +1,5 @@
 import math
+import warnings
 from os import listdir
 from os.path import join
 from random import choice, uniform
@@ -201,6 +202,7 @@ def ycbcr_to_rgb(image: torch.Tensor) -> torch.Tensor:
 
 
 def augment_batch(images: torch.Tensor, p: float) -> torch.Tensor:
+    warnings.warn("augment_batch is deprecated", DeprecationWarning)
     batch_size, channels, h_orig, w_orig = images.size()
     images = pad(images, padding=(w_orig - 1, h_orig - 1, w_orig - 1, h_orig - 1), padding_mode='reflect')
     batch_size, channels, h, w = images.size()
