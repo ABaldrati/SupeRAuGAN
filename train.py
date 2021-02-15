@@ -2,6 +2,7 @@ import datetime
 from argparse import ArgumentParser
 from math import log10
 from pathlib import Path
+from statistics import mean
 
 import numpy as np
 import pytorch_ssim
@@ -28,6 +29,8 @@ NUM_RESIDUAL_BLOCKS = 16
 NUM_LOGGED_VALIDATION_IMAGES = 16
 AUGMENT_PROB_TARGET = 0.6
 ADV_LOSS_BALANCER = 4e-5
+BATCH_SIZE = 32
+RT_BATCH_SMOOTHING_FACTOR = 8
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -105,6 +108,9 @@ def main():
 
     augment_probability = 0
     num_images = len(train_set) * (NUM_PRETRAIN_EPOCHS + NUM_ADV_EPOCHS)
+    prediction_list = []
+    rt = 0
+
     for epoch in range(1, NUM_PRETRAIN_EPOCHS + NUM_ADV_EPOCHS + 1):
         train_bar = tqdm(train_loader, ncols=200)
         running_results = {'batch_sizes': 0, 'd_epoch_total_loss': 0, 'g_epoch_total_loss': 0, 'g_epoch_adv_loss': 0,
@@ -159,12 +165,16 @@ def main():
             g_total_loss.backward()
             g_optimizer.step()
 
-            if epoch > NUM_PRETRAIN_EPOCHS:
-                rt = torch.mean(torch.sign(d_real_output - 0.5))
-                if rt > AUGMENT_PROB_TARGET:
-                    augment_probability = min(1., augment_probability + 1e-3)
-                else:
-                    augment_probability = max(0., augment_probability - 1e-3)
+            if epoch > NUM_PRETRAIN_EPOCHS and ENABLE_AUGMENTATION:
+                prediction_list.append((torch.sign(d_real_output - 0.5)).tolist())
+                if len(prediction_list) == RT_BATCH_SMOOTHING_FACTOR:
+                    rt_list = [prediction for sublist in prediction_list for prediction in sublist]
+                    rt = mean(rt_list)
+                    if mean(rt_list) > AUGMENT_PROB_TARGET:
+                        augment_probability = min(1., augment_probability + 1e-3)
+                    else:
+                        augment_probability = max(0., augment_probability - 1e-3)
+                    prediction_list.clear()
 
             running_results['g_epoch_total_loss'] += g_total_loss.to('cpu', non_blocking=True).detach() * batch_size
             running_results['g_epoch_adv_loss'] += adversarial_loss.to('cpu', non_blocking=True).detach() * batch_size
@@ -173,7 +183,7 @@ def main():
                 running_results['d_epoch_total_loss'] += d_total_loss.to('cpu', non_blocking=True).detach() * batch_size
                 running_results['d_epoch_real_mean'] += d_real_mean.to('cpu', non_blocking=True).detach() * batch_size
                 running_results['d_epoch_fake_mean'] += d_fake_mean.to('cpu', non_blocking=True).detach() * batch_size
-                running_results['rt'] += rt.to('cpu', non_blocking=True).detach() * batch_size
+                running_results['rt'] += rt * batch_size
                 running_results['augment_probability'] += augment_probability * batch_size
 
             train_bar.set_description(
