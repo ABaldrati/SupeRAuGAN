@@ -77,14 +77,15 @@ def main():
     val_set = Subset(val_set, list(
         np.random.choice(np.arange(len_val_set), int(len_val_set * VAL_DATASET_PERCENTAGE / 100), False)))
 
-    train_loader = DataLoader(dataset=train_set, num_workers=4, batch_size=32, shuffle=True, pin_memory=True)
+    train_loader = DataLoader(dataset=train_set, num_workers=4, batch_size=BATCH_SIZE, shuffle=True,
+                              pin_memory=True)
     val_loader = DataLoader(dataset=val_set, num_workers=4, batch_size=NUM_LOGGED_VALIDATION_IMAGES, shuffle=False,
                             pin_memory=True)
 
     epoch_validation_hr_dataset = HrValDatasetFromFolder('data/ffhq/images512x512/val_set')
 
     results_folder = Path(
-        f"results_{training_start}_CS:{PATCH_SIZE}_US:{UPSCALE_FACTOR}x_TRAIN:{TRAIN_DATASET_PERCENTAGE}%")
+        f"results_{training_start}_CS:{PATCH_SIZE}_US:{UPSCALE_FACTOR}x_TRAIN:{TRAIN_DATASET_PERCENTAGE}%_AUGMENTATION:{ENABLE_AUGMENTATION}")
     results_folder.mkdir(exist_ok=True)
     writer = SummaryWriter(str(results_folder / "tensorboard_log"))
     g_net = Generator(n_residual_blocks=NUM_RESIDUAL_BLOCKS, upsample_factor=UPSCALE_FACTOR)
