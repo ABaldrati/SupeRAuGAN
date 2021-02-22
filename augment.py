@@ -478,12 +478,3 @@ class AugmentPipe(torch.nn.Module):
         return images
 
 # ----------------------------------------------------------------------------
-
-if __name__ == '__main__':
-    augment_net = AugmentPipe().cuda()
-    augment_net.p = torch.tensor([0.5]).cuda()
-    image = Image.open('dog.jpg')
-    tensor_image = ToTensor()(image).unsqueeze(0).cuda()
-    aug_image = augment_net(tensor_image)
-    aug_image = ToPILImage()(aug_image.squeeze(0))
-    aug_image.save('dog_aug.jpg')
