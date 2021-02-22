@@ -57,7 +57,7 @@ class Generator(nn.Module):
 
         upsample_blocks_list = [UpsampleBlock(base_filters, 2) for _ in range(self.upsample_block_num)]
         self.upsample_block = nn.Sequential(*upsample_blocks_list)
-        self.upsample_bilinear = nn.Upsample(scale_factor=upsample_factor, mode="bicubic", align_corners=True)
+        self.upsample_bicubic = nn.Upsample(scale_factor=upsample_factor, mode="bicubic", align_corners=True)
 
         self.last_conv = nn.Conv2d(base_filters, 3, kernel_size=9, padding=4)
 
@@ -71,7 +71,7 @@ class Generator(nn.Module):
 
         output = self.upsample_block(output)
 
-        return self.last_conv(output) + self.upsample_bilinear(x)
+        return self.last_conv(output) + self.upsample_bicubic(x)
 
 
 class Discriminator(nn.Module):
