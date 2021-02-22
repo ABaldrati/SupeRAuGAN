@@ -31,6 +31,7 @@ AUGMENT_PROB_TARGET = 0.6
 ADV_LOSS_BALANCER = 4e-5
 BATCH_SIZE = 32
 RT_BATCH_SMOOTHING_FACTOR = 8
+AUGMENT_PROBABABILITY_STEP = 1e-3
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -172,9 +173,9 @@ def main():
                     rt_list = [prediction for sublist in prediction_list for prediction in sublist]
                     rt = mean(rt_list)
                     if mean(rt_list) > AUGMENT_PROB_TARGET:
-                        augment_probability = min(1., augment_probability + 1e-3)
+                        augment_probability = min(1., augment_probability + AUGMENT_PROBABABILITY_STEP)
                     else:
-                        augment_probability = max(0., augment_probability - 1e-3)
+                        augment_probability = max(0., augment_probability - AUGMENT_PROBABABILITY_STEP)
                     prediction_list.clear()
 
             running_results['g_epoch_total_loss'] += g_total_loss.to('cpu', non_blocking=True).detach() * batch_size
