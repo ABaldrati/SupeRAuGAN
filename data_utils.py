@@ -42,6 +42,11 @@ def display_transform():
         CenterCrop(400),
     ])
 
+def test_display_transform():
+    return Compose([
+        Resize(512),
+        CenterCrop(512),
+    ])
 
 class TrainDatasetFromFolder(Dataset):
     def __init__(self, dataset_dir, patch_size, upscale_factor):
