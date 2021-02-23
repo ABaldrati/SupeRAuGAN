@@ -71,6 +71,7 @@ Folders ```torch_utils``` and ```dnnlib``` are vendored dependencies of ```augme
 * [**Alberto Baldrati**](https://github.com/ABaldrati)
 * [**Giovanni Berti**](https://github.com/giovanniberti)
 
+Under the supervision of [**Leonardo Galteri**](https://scholar.google.it/citations?user=_n2R2bUAAAAJ&hl=it)
 
 ## Acknowledgments
 Visual and Multimedia Recognition © Course held by Professor [Alberto Del Bimbo](https://scholar.google.it/citations?user=bf2ZrFcAAAAJ) - Computer Engineering Master Degree @[University of Florence](https://www.unifi.it/changelang-eng.html)
