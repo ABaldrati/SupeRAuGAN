@@ -113,3 +113,7 @@ def main():
 
     data_frame = pd.DataFrame(data=test_results)
     data_frame.to_csv(str(test_folder / f"global_results.csv"), mode='a', index=False)
+
+
+if __name__ == '__main__':
+    main()
