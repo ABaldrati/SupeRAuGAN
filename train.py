@@ -284,8 +284,8 @@ def main():
                 'progress': image_percentage,
                 'g_net': g_net.state_dict(),
                 'd_net': g_net.state_dict(),
-                'g_optimizer': g_optimizer.state_dict(),
-                'd_optimizer': d_optimizer.state_dict(),
+                #'g_optimizer': g_optimizer.state_dict(), Uncomment this if you want resume training
+                #'d_optimizer': d_optimizer.state_dict(),
             }, str(models_path / f'progress_{image_percentage:.1f}.tar'))
 
 
