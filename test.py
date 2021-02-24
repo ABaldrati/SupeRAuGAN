@@ -61,7 +61,7 @@ def main():
 
     with torch.no_grad():
         test_bar = tqdm(test_loader, ncols=160)
-        test_results = {'name': model_name, 'psnr': 0, 'ssim': 0, 'lpips': 0, 'fid': 0}
+        test_results = {'psnr': 0, 'ssim': 0, 'lpips': 0, 'fid': 0}
         accumulated_results = {'accumulated_mse': 0, 'accumulated_ssim': 0, 'accumulated_psnr': 0,
                                'accumulated_lpips': 0, 'batch_sizes': 0}
         test_images = torch.empty((0, 0))
@@ -109,10 +109,10 @@ def main():
 
         for index, image_batch in enumerate(test_save_bar, start=1):
             image_grid = utils.make_grid(image_batch, nrow=3, padding=5)
-            utils.save_image(image_grid, images_path + f"{index}.png", padding=5)
+            utils.save_image(image_grid, str(images_path / f"{index}.png"), padding=5)
 
-    data_frame = pd.DataFrame(data=test_results)
-    data_frame.to_csv(str(test_folder / f"global_results.csv"), mode='a', index=False)
+    data_frame = pd.DataFrame(data=test_results, index=[model_name])
+    data_frame.to_csv(str(test_folder / f"global_results.csv"), mode='a', index_label="Name")
 
 
 if __name__ == '__main__':
