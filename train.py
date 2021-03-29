@@ -28,12 +28,15 @@ NUM_BASELINE_PRETRAIN_EPOCHS = 5
 PATCH_SIZE = 128
 UPSCALE_FACTOR = 4
 NUM_RESIDUAL_BLOCKS = 16
-NUM_LOGGED_VALIDATION_IMAGES = 16
+NUM_LOGGED_VALIDATION_IMAGES = 16  # Should be a multiple of 4
+VAL_BATCH_SIZE = 32
 AUGMENT_PROB_TARGET = 0.6
 ADV_LOSS_BALANCER = 4e-5
 BATCH_SIZE = 32
 RT_BATCH_SMOOTHING_FACTOR = 8
 AUGMENT_PROBABABILITY_STEP = 1e-3
+# AUGMENT_PROBABABILITY_STEP = 15e-4
+CENTER_CROP_SIZE = 512
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -44,9 +47,9 @@ else:
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument("--augmentation", action='store_true', default=False)
-    parser.add_argument("--train-dataset-percentage", type=int, default=100)
-    parser.add_argument("--val-dataset-percentage", type=int, default=5)
+    parser.add_argument("--augmentation", action='store_true')
+    parser.add_argument("--train-dataset-percentage", type=float, default=100)
+    parser.add_argument("--val-dataset-percentage", type=int, default=100)
     parser.add_argument("--label-smoothing", type=float, default=0.9)
     parser.add_argument("--validation-frequency", type=int, default=1)
     args = parser.parse_args()
