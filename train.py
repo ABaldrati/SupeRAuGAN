@@ -91,7 +91,7 @@ def main():
     val_loader = DataLoader(dataset=val_set, num_workers=2, batch_size=VAL_BATCH_SIZE, shuffle=False,
                             pin_memory=True, prefetch_factor=2)
 
-    epoch_validation_hr_dataset = HrValDatasetFromFolder(val_dataset_dir)
+    epoch_validation_hr_dataset = HrValDatasetFromFolder(val_dataset_dir)  # Useful to compute FID metric
 
     results_folder = Path(
         f"results_{training_start}_CS:{PATCH_SIZE}_US:{UPSCALE_FACTOR}x_TRAIN:{TRAIN_DATASET_PERCENTAGE}%_AUGMENTATION:{ENABLE_AUGMENTATION}")
@@ -271,7 +271,8 @@ def main():
                                                              0).transpose(0, 1)))))
                 val_results['epoch_fid'] = calculate_metrics(
                     epoch_validation_sr_dataset, epoch_validation_hr_dataset,
-                    cuda=True, fid=True, verbose=True)['frechet_inception_distance']
+                    cuda=True, fid=True, verbose=True)[
+                    'frechet_inception_distance']  # Set batch_size=1 if you get memory error (inside calculate metric function)
 
                 val_images = val_images.view(
                     (NUM_LOGGED_VALIDATION_IMAGES // 4, -1, 3, CENTER_CROP_SIZE, CENTER_CROP_SIZE))
