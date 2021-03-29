@@ -1,4 +1,6 @@
 import datetime
+import gc
+import os
 from argparse import ArgumentParser
 from math import log10
 from pathlib import Path
@@ -199,7 +201,10 @@ def main():
                      f'rt: {running_results["rt"] / running_results["batch_sizes"]:.4f} '
                      f'augment_probability: {running_results["augment_probability"] / running_results["batch_sizes"]:.4f}')
 
-        if epoch % VALIDATION_FREQUENCY == 1 or VALIDATION_FREQUENCY == 1:
+        if epoch == 1 or epoch == (
+                NUM_PRETRAIN_EPOCHS + NUM_ADV_EPOCHS) or epoch % VALIDATION_FREQUENCY == 0 or VALIDATION_FREQUENCY == 1:
+            torch.cuda.empty_cache()
+            gc.collect()
             g_net.eval()
             # ...
             images_path = results_folder / Path(f'training_images_results')
@@ -267,16 +272,21 @@ def main():
         results['d_fake_mean'].append(running_results['d_epoch_fake_mean'] / running_results['batch_sizes'])
         results['rt'].append(running_results['rt'] / running_results['batch_sizes'])
         results['augment_probability'].append(running_results['augment_probability'] / running_results['batch_sizes'])
-        if epoch % VALIDATION_FREQUENCY == 1 or VALIDATION_FREQUENCY == 1:
+        if epoch == 1 or epoch == (
+                NUM_PRETRAIN_EPOCHS + NUM_ADV_EPOCHS) or epoch % VALIDATION_FREQUENCY == 0 or VALIDATION_FREQUENCY == 1:
             results['psnr'].append(val_results['epoch_avg_psnr'])
             results['ssim'].append(val_results['epoch_avg_ssim'])
             results['lpips'].append(val_results['epoch_avg_lpips'])
             results['fid'].append(val_results['epoch_fid'])
 
         for metric, metric_values in results.items():
-            writer.add_scalar(metric, metric_values[-1], int(image_percentage * num_images * 0.01))
+            if epoch == 1 or epoch == (
+                    NUM_PRETRAIN_EPOCHS + NUM_ADV_EPOCHS) or epoch % VALIDATION_FREQUENCY == 0 or VALIDATION_FREQUENCY == 1 or \
+                    metric not in ["psnr", "ssim", "lpips", "fid"]:
+                writer.add_scalar(metric, metric_values[-1], int(image_percentage * num_images * 0.01))
 
-        if epoch % VALIDATION_FREQUENCY == 1 or VALIDATION_FREQUENCY == 1:
+        if epoch == 1 or epoch == (
+                NUM_PRETRAIN_EPOCHS + NUM_ADV_EPOCHS) or epoch % VALIDATION_FREQUENCY == 0 or VALIDATION_FREQUENCY == 1:
             # save model parameters
             models_path = results_folder / "saved_models"
             models_path.mkdir(exist_ok=True)
