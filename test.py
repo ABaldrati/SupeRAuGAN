@@ -2,17 +2,17 @@ from argparse import ArgumentParser
 from math import log10
 from pathlib import Path
 
+import pandas as pd
 import pytorch_ssim
 import torch
+import torchvision.utils as utils
 from lpips import lpips
 from torch.utils.data import DataLoader, ConcatDataset
+from torch_fidelity import calculate_metrics
 from tqdm import tqdm
 
 from data_utils import ValDatasetFromFolder, SingleTensorDataset, test_display_transform, HrValDatasetFromFolder
 from model import Generator
-import torchvision.utils as utils
-from torch_fidelity import calculate_metrics
-import pandas as pd
 
 UPSCALE_FACTOR = 4
 NUM_RESIDUAL_BLOCKS = 16
@@ -106,13 +106,13 @@ def main():
                          test_display_transform()(sr.data.cpu()).unsqueeze(0).transpose(0, 1)))
                 else:
                     test_images = torch.cat((test_images,
-                                            torch.hstack(
-                                                (test_display_transform()(test_hr_restore).unsqueeze(
-                                                    0).transpose(0, 1),
-                                                 test_display_transform()(hr.data.cpu()).unsqueeze(
+                                             torch.hstack(
+                                                 (test_display_transform()(test_hr_restore).unsqueeze(
                                                      0).transpose(0, 1),
-                                                 test_display_transform()(sr.data.cpu()).unsqueeze(
-                                                     0).transpose(0, 1)))))
+                                                  test_display_transform()(hr.data.cpu()).unsqueeze(
+                                                      0).transpose(0, 1),
+                                                  test_display_transform()(sr.data.cpu()).unsqueeze(
+                                                      0).transpose(0, 1)))))
         test_results['fid'] = calculate_metrics(test_sr_dataset, test_hr_dataset,
                                                 cuda=True, fid=True, verbose=True)['frechet_inception_distance']
 

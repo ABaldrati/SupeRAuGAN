@@ -1,8 +1,8 @@
 import math
 
 import torch
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
 
 
 class ResidualBlock(nn.Module):
@@ -121,4 +121,3 @@ class Discriminator(nn.Module):
         output = F.leaky_relu(self.bn8(self.conv8(output)), 0.2)
         output = torch.flatten(output, 1)
         return self.classifier(output).view(batch_size)
-

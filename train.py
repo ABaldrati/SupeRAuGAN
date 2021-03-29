@@ -1,6 +1,5 @@
 import datetime
 import gc
-import os
 from argparse import ArgumentParser
 from math import log10
 from pathlib import Path
