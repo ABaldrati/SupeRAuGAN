@@ -35,8 +35,10 @@ ADV_LOSS_BALANCER = 4e-5
 BATCH_SIZE = 32
 RT_BATCH_SMOOTHING_FACTOR = 8
 AUGMENT_PROBABABILITY_STEP = 1e-3
-# AUGMENT_PROBABABILITY_STEP = 15e-4
 CENTER_CROP_SIZE = 512
+
+train_dataset_dir = 'data/ffhq/images512x512/train_set'
+val_dataset_dir = 'data/ffhq/images512x512/val_set'
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -72,8 +74,6 @@ def main():
     VALIDATION_FREQUENCY = round(VALIDATION_FREQUENCY / (TRAIN_DATASET_PERCENTAGE / 100))
 
     training_start = datetime.datetime.now().isoformat()
-    train_dataset_dir = 'data/ffhq/images512x512/train_set'
-    val_dataset_dir = 'data/ffhq/images512x512/val_set'
 
     train_set = TrainDatasetFromFolder(train_dataset_dir, patch_size=PATCH_SIZE,
                                        upscale_factor=UPSCALE_FACTOR)
