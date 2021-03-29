@@ -17,7 +17,7 @@ import pandas as pd
 UPSCALE_FACTOR = 4
 NUM_RESIDUAL_BLOCKS = 16
 BATCH_SIZE = 32
-NUM_LOGGED_TEST_IMAGES = BATCH_SIZE
+NUM_LOGGED_TEST_IMAGES = 32
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -98,11 +98,23 @@ def main():
                      f"SSIM: {test_results['ssim']:4f} "
                      f"LPIPS: {test_results['lpips']:.4f} ")
             if test_images.size(0) * test_images.size(1) < NUM_LOGGED_TEST_IMAGES * 3:
-                test_images = torch.hstack((test_display_transform()(test_hr_restore).unsqueeze(0).transpose(0, 1),
-                                           test_display_transform()(hr.data.cpu()).unsqueeze(0).transpose(0, 1),
-                                           test_display_transform()(sr.data.cpu()).unsqueeze(0).transpose(0, 1)))
+
+                if test_images.size(0) == 0:
+                    test_images = torch.hstack(
+                        (test_display_transform()(test_hr_restore).unsqueeze(0).transpose(0, 1),
+                         test_display_transform()(hr.data.cpu()).unsqueeze(0).transpose(0, 1),
+                         test_display_transform()(sr.data.cpu()).unsqueeze(0).transpose(0, 1)))
+                else:
+                    test_images = torch.cat((test_images,
+                                            torch.hstack(
+                                                (test_display_transform()(test_hr_restore).unsqueeze(
+                                                    0).transpose(0, 1),
+                                                 test_display_transform()(hr.data.cpu()).unsqueeze(
+                                                     0).transpose(0, 1),
+                                                 test_display_transform()(sr.data.cpu()).unsqueeze(
+                                                     0).transpose(0, 1)))))
         test_results['fid'] = calculate_metrics(test_sr_dataset, test_hr_dataset,
-                                                cuda=True, fid=True, verbose=False)['frechet_inception_distance']
+                                                cuda=True, fid=True, verbose=True)['frechet_inception_distance']
 
         test_images = test_images.view((NUM_LOGGED_TEST_IMAGES, -1, 3, 512, 512))
         test_save_bar = tqdm(test_images, desc='[saving test results]', ncols=160)
