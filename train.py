@@ -255,14 +255,26 @@ def main():
                              f"SSIM: {val_results['epoch_avg_ssim']:4f} "
                              f"LPIPS: {val_results['epoch_avg_lpips']:.4f} ")
                     if val_images.size(0) * val_images.size(1) < NUM_LOGGED_VALIDATION_IMAGES * 3:
-                        val_images = torch.hstack((display_transform()(val_hr_restore).unsqueeze(0).transpose(0, 1),
-                                                   display_transform()(hr.data.cpu()).unsqueeze(0).transpose(0, 1),
-                                                   display_transform()(sr.data.cpu()).unsqueeze(0).transpose(0, 1)))
+                        if val_images.size(0) == 0:
+                            val_images = torch.hstack(
+                                (display_transform(CENTER_CROP_SIZE)(val_hr_restore).unsqueeze(0).transpose(0, 1),
+                                 display_transform(CENTER_CROP_SIZE)(hr.data.cpu()).unsqueeze(0).transpose(0, 1),
+                                 display_transform(CENTER_CROP_SIZE)(sr.data.cpu()).unsqueeze(0).transpose(0, 1)))
+                        else:
+                            val_images = torch.cat((val_images,
+                                                    torch.hstack(
+                                                        (display_transform(CENTER_CROP_SIZE)(val_hr_restore).unsqueeze(
+                                                            0).transpose(0, 1),
+                                                         display_transform(CENTER_CROP_SIZE)(hr.data.cpu()).unsqueeze(
+                                                             0).transpose(0, 1),
+                                                         display_transform(CENTER_CROP_SIZE)(sr.data.cpu()).unsqueeze(
+                                                             0).transpose(0, 1)))))
                 val_results['epoch_fid'] = calculate_metrics(
                     epoch_validation_sr_dataset, epoch_validation_hr_dataset,
-                    cuda=True, fid=True, verbose=False)['frechet_inception_distance']
+                    cuda=True, fid=True, verbose=True)['frechet_inception_distance']
 
-                val_images = val_images.view((4, -1, 3, 400, 400))
+                val_images = val_images.view(
+                    (NUM_LOGGED_VALIDATION_IMAGES // 4, -1, 3, CENTER_CROP_SIZE, CENTER_CROP_SIZE))
                 val_save_bar = tqdm(val_images, desc='[saving validation results]', ncols=160)
 
                 for index, image_batch in enumerate(val_save_bar, start=1):
