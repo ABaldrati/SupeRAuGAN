@@ -181,7 +181,7 @@ def main():
                     rt_list = [prediction for sublist in prediction_list for prediction in sublist]
                     rt = mean(rt_list)
                     if mean(rt_list) > AUGMENT_PROB_TARGET:
-                        augment_probability = min(1., augment_probability + AUGMENT_PROBABABILITY_STEP)
+                        augment_probability = min(0.85, augment_probability + AUGMENT_PROBABABILITY_STEP)
                     else:
                         augment_probability = max(0., augment_probability - AUGMENT_PROBABABILITY_STEP)
                     prediction_list.clear()
