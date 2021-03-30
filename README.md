@@ -11,15 +11,19 @@
   * [Prerequisites](#prerequisites)
   * [Installation](#installation)
 * [Usage](#usage)
+* [Images](#images)
 * [Authors](#authors)
 * [Acknowledgments](#acknowledgments)
 
 
 ## About The Project
 
-In ```SupeRAuGAN``` we implement a novel data augmentation technique tailored to Generative Adversarial Networks in order to reduce discriminator overfitting and stabilize training. This technique was first described by [Karras et al.](https://arxiv.org/abs/2006.06676) and applied in an image generation from latent space task. We experiment such approach in a super resolution setting using a slightly modified SRGAN (described in [Ledig et al.](https://arxiv.org/abs/1609.04802)) achieving promising results when using a small amount of data
+In ```SupeRAuGAN``` we implement a novel data augmentation technique tailored to Generative Adversarial Networks in order to reduce discriminator overfitting and stabilize training. This technique was first described by [Karras et al.](https://arxiv.org/abs/2006.06676) and applied in an image generation from latent space task. We experiment such approach in a super resolution setting using a slightly modified SRGAN (described in [Ledig et al.](https://arxiv.org/abs/1609.04802)) achieving promising results when using a small amount of data.
+
+More info about the whole project available at [paper](https://gitlab.com/reddeadrecovery/superaugan/-/blob/master/docs/SuperAuGan.pdf) and [slides](https://gitlab.com/reddeadrecovery/superaugan/-/blob/master/docs/SuperAuGan_presentation.pdf)
 
 Original implementation available at [repo](https://github.com/NVlabs/stylegan2-ada-pytorch)
+
 
 ### Built With
 
@@ -65,6 +69,15 @@ Here's a brief description of each and every file in the repo:
 * ```augment.py```: Data augmentation pipeline (taken from [here](https://github.com/NVlabs/stylegan2-ada-pytorch))
 
 Folders ```torch_utils``` and ```dnnlib``` are vendored dependencies of ```augment.py```
+
+## Images
+Original downsampled images on the left, ground truthimages in the center and generated images on the right
+
+
+
+![](images/ffhq_24.png)
+![](images/ffhq_30.png)
+![](images/div2k_29.png)
 
 ## Authors
 
